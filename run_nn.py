@@ -11,8 +11,8 @@ from sgld_optimizer import SGLD
 
 # returns a list of length 20 representing the accuracies in each bin
 def acc_vs_confidence(model, data_loader):
-    correct = [0 for i in range(20)]
-    total = [0 for i in range(20)]
+    correct = [0 for i in range(21)]
+    total = [0 for i in range(21)]
     with torch.no_grad():
         for i, (inputs, labels) in enumerate(data_loader):
 
@@ -25,7 +25,7 @@ def acc_vs_confidence(model, data_loader):
                 if predictions[j] == labels[j]:
                     correct[bin] = correct[bin] + 1
 
-    return [(correct[i] / total[i] if total[i] > 0 else 0) for i in range(20)]
+    return [(correct[i] / total[i] if total[i] > 0 else 0) for i in range(21)]
 
 
 # returns a list of length "epochs" representing the accuracies after each epoch
@@ -54,8 +54,8 @@ def train_model(model, optimizer, criterion, train_loader, val_loader, epochs):
 
 
 if __name__ == '__main__':
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # print(device)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(device)
 
     # torch.backends.cudnn.benchmark = True
 
@@ -120,7 +120,7 @@ if __name__ == '__main__':
         # initialize model
         model_args = list()
         model_kwargs = get_kwargs(dataset, model_cfg, False, features, outputs)
-        model = model_cfg.base(*model_args, **model_kwargs)
+        model = model_cfg.base(*model_args, **model_kwargs).to(device)
         model.train()
 
         optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -134,7 +134,7 @@ if __name__ == '__main__':
         # compute accuracy vs confidence at the end
         if optim == 'both':
             accuracy_ls = acc_vs_confidence(model, val_loader)
-            ax1.bar(range(20), accuracy_ls)
+            ax1.bar([x/20 for x in range(21)], accuracy_ls)
 
     if optim == 'SGLD' or optim == 'both':
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         # initialize model
         model_args = list()
         model_kwargs = get_kwargs(dataset, model_cfg, False, features, outputs)
-        model = model_cfg.base(*model_args, **model_kwargs)
+        model = model_cfg.base(*model_args, **model_kwargs).to(device)
         model.train()
 
         optimizer = SGLD(model.parameters(), lr=lr)
@@ -157,7 +157,7 @@ if __name__ == '__main__':
         # compute accuracy vs confidence at the end
         if optim == 'both':
             accuracy_ls = acc_vs_confidence(model, val_loader)
-            ax2.bar(range(20), accuracy_ls)
+            ax2.bar([x/20 for x in range(21)], accuracy_ls)
 
     if optim == 'both':
         ax.legend()
@@ -165,3 +165,4 @@ if __name__ == '__main__':
 
     if optim == 'both':
         fig2.savefig('results/'+net_type+'_accuracy_vs_confidence.png')
+
