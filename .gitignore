@@ -1,0 +1,12 @@
+__pycache__/
+venv/
+.idea/
+
+model_info/
+results/
+
+
+classification_data/
+classification_data.tar
+cifar-10-batches-py/
+cifar-10-python.tar
