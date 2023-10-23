@@ -17,7 +17,6 @@ def acc_vs_confidence(model, data_loader):
     model.eval()
     with torch.no_grad():
         for i, (inputs, labels) in enumerate(data_loader):
-
             softmax_scores = torch.softmax(model(inputs), dim=-1)
             confidence_vals, predictions = torch.max(softmax_scores, dim=-1)
 
@@ -33,35 +32,45 @@ def acc_vs_confidence(model, data_loader):
 # returns a list of length "epochs" representing the validation accuracies after each epoch
 def train_model(model, optimizer, criterion, train_loader, val_loader, epochs):
     acc = []
+    train_loss = []
+    val_loss = []
+    # with torch.autograd.detect_anomaly():
     for epoch in range(epochs):
 
         # train
         model.train()
+        total_loss = 0
         for i, (inputs, labels) in enumerate(train_loader):
             optimizer.zero_grad()
             loss = criterion(model(inputs), labels)
+            total_loss += loss.item() * inputs.size(0)
             loss.backward()
             optimizer.step()
+        train_loss.append(total_loss / len(train_loader.dataset))
 
         # validate
         model.eval()
         with torch.no_grad():
+            total_loss = 0
             correct = 0
             for i, (inputs, labels) in enumerate(val_loader):
-                predictions = torch.argmax(model(inputs), dim=1)
+                outputs = model(inputs)
+                total_loss += criterion(outputs, labels).item() * inputs.size(0)
+                predictions = torch.argmax(outputs, dim=1)
                 for j in range(len(predictions)):
                     if predictions[j] == labels[j]:
                         correct += 1
-            acc.append(correct / len(testset))
+            val_loss.append(total_loss / len(val_loader.dataset))
+            acc.append(correct / len(val_loader.dataset))
 
-    return acc
+    return acc, train_loss, val_loss
 
 
 if __name__ == '__main__':
 
     # make necessary subdirectories
-    if not os.path.exists('model_info'):
-        os.mkdir('model_info')
+    if not os.path.exists('checkpoints'):
+        os.mkdir('checkpoints')
     if not os.path.exists('results'):
         os.mkdir('results')
 
@@ -113,21 +122,33 @@ if __name__ == '__main__':
 
     # initialize figure 1 (validation accuracy)
     fig1 = plt.figure()
-    ax = fig1.add_subplot()
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Validation Accuracy')
+    fig1ax = fig1.add_subplot()
+    fig1ax.set_xlabel('Epoch')
+    fig1ax.set_ylabel('Validation Accuracy')
     fig1.suptitle('Accuracy Curves (lr=' + str(lr) + ')')
 
-    # initialize figure 2 (training loss)
+    # initialize figure 2 (SGD loss)
+    fig2 = plt.figure()
+    fig2ax = fig2.add_subplot()
+    fig2ax.set_xlabel('Epoch')
+    fig2ax.set_ylabel('Log Loss')
+    fig2.suptitle('SGD Loss Curves (lr=' + str(lr) + ')')
 
-    # initialize figure 3 (accuracy vs confidence)
-    fig3, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.set_title('SGD')
-    ax2.set_title('SGLD')
-    ax1.set_xlabel('Confidence')
-    ax1.set_ylabel('Accuracy')
-    ax2.set_xlabel('Confidence')
-    fig3.suptitle('Accuracy vs Confidence')
+    # initialize figure 3 (SGLD loss)
+    fig3 = plt.figure()
+    fig3ax = fig3.add_subplot()
+    fig3ax.set_xlabel('Epoch')
+    fig3ax.set_ylabel('Log Loss')
+    fig3.suptitle('SGLD Loss Curves (lr=' + str(lr) + ')')
+
+    # initialize figure 4 (accuracy vs confidence)
+    fig4, (fig4ax1, fig4ax2) = plt.subplots(1, 2)
+    fig4ax1.set_title('SGD')
+    fig4ax2.set_title('SGLD')
+    fig4ax1.set_xlabel('Confidence')
+    fig4ax1.set_ylabel('Accuracy')
+    fig4ax2.set_xlabel('Confidence')
+    fig4.suptitle('Accuracy vs Confidence')
 
     if optim == 'SGD' or optim == 'both':
 
@@ -137,7 +158,7 @@ if __name__ == '__main__':
         model = model_cfg.base(*model_args, **model_kwargs).to(device)
 
         try:
-            model.load_state_dict(torch.load('model_info/' + net_type + key + '_SGD.pt'))
+            model.load_state_dict(torch.load('checkpoints/' + key + '_' + net_type + '_SGD_modelinfo.pt'))
 
             print("RECOVERED MODEL PREVIOUSLY TRAINED WITH SGD")
 
@@ -150,14 +171,19 @@ if __name__ == '__main__':
             criterion = nn.CrossEntropyLoss()
 
             # train model
-            acc_ls = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
-            torch.save(model.state_dict(), 'model_info/' + net_type + key + '_SGD.pt')
-            ax.plot(range(epochs), acc_ls, label='sgd')
+            val_acc, train_loss, val_loss = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+            torch.save(model.state_dict(), 'checkpoints/' + key + '_' + net_type + '_SGD_modelinfo.pt')
+            fig1ax.plot(range(epochs), val_acc, label='sgd')
+            fig2ax.plot(range(epochs), train_loss, label='train')
+            fig2ax.plot(range(epochs), val_loss, label='validation')
+            fig2ax.legend()
+            fig2.savefig('results/' + net_type + '_SGD_loss_curves.png')
 
         # compute accuracy vs confidence at the end
         print("TESTING SGD MODEL")
         accuracy_ls = acc_vs_confidence(model, test_loader)
-        ax1.bar([x/20 for x in range(21)], accuracy_ls, width=0.05, align='edge')
+        fig4ax1.bar([x / 20 for x in range(21)], accuracy_ls, width=0.05, align='edge')
+        fig4ax1.plot([0, 1], [0, 1], color='r')
 
     if optim == 'SGLD' or optim == 'both':
 
@@ -167,7 +193,7 @@ if __name__ == '__main__':
         model = model_cfg.base(*model_args, **model_kwargs).to(device)
 
         try:
-            model.load_state_dict(torch.load('model_info/' + net_type + key + '_SGLD.pt'))
+            model.load_state_dict(torch.load('checkpoints/' + key + '_' + net_type + '_SGLD_modelinfo.pt'))
 
             print("RECOVERED MODEL PREVIOUSLY TRAINED WITH SGLD")
 
@@ -180,17 +206,22 @@ if __name__ == '__main__':
             criterion = nn.CrossEntropyLoss()
 
             # train model
-            acc_ls = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
-            torch.save(model.state_dict(), 'model_info/' + net_type + key + '_SGLD.pt')
-            ax.plot(range(epochs), acc_ls, label='sgld')
+            val_acc, train_loss, val_loss = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+            torch.save(model.state_dict(), 'checkpoints/' + key + '_' + net_type + '_SGLD_modelinfo.pt')
+            fig1ax.plot(range(epochs), val_acc, label='sgld')
+            fig3ax.plot(range(epochs), train_loss, label='train')
+            fig3ax.plot(range(epochs), val_loss, label='validation')
+            fig3ax.legend()
+            fig3.savefig('results/' + net_type + '_SGLD_loss_curves.png')
 
         # compute accuracy vs confidence at the end
         print("TESTING SGLD MODEL")
         accuracy_ls = acc_vs_confidence(model, test_loader)
-        ax2.bar([x/20 for x in range(21)], accuracy_ls, width=0.05, align='edge')
+        fig4ax2.bar([x / 20 for x in range(21)], accuracy_ls, width=0.05, align='edge')
+        fig4ax2.plot([0, 1], [0, 1], color='r')
 
-    ax.legend()
+    fig1ax.legend()
     fig1.savefig('results/' + net_type + '_accuracy_curves.png')
 
-    fig3.savefig('results/' + net_type + '_accuracy_vs_confidence.png')
+    fig4.savefig('results/' + net_type + '_accuracy_vs_confidence.png')
 
