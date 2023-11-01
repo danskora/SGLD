@@ -9,6 +9,7 @@ from torchvision import transforms
 from sgld_optimizer import NewSGLD
 from torch.utils.data import Subset
 import os
+import math
 
 
 class NoisyMNIST(torchvision.datasets.MNIST):
@@ -36,9 +37,24 @@ def get_MNIST(noise=0.0, size=60000, train=True):
                                                                         transforms.ToTensor()]))
 
 
+def g_e(model, optimizer, criterion, dataset):
+    indices = torch.randperm(len(dataset))[:200].tolist()
+    total = 0
+    for idx in indices:
+        datapoint, label = dataset[idx]
+        datapoint.unsqueeze_(0)
+        optimizer.zero_grad()
+        loss = criterion(model(datapoint), torch.tensor([label]))
+        loss.backward()
+        for p in model.parameters():
+            total += torch.sum(torch.mul(p.grad, p.grad))
+    return total/200
+
+
 def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
     train_acc = []
     gen_error = []
+    sum_term = [0]
 
     for epoch in range(epochs):
 
@@ -46,6 +62,7 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
         model.train()
         correct = 0
         for i, (inputs, labels) in enumerate(train_loader):
+            sum_term.append(sum_term[-1] + g_e(model, optimizer, criterion, train_loader.dataset))
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -69,7 +86,9 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
         test_acc = correct / len(test_loader.dataset)
         gen_error.append(train_acc[-1] - test_acc)
 
-    return train_acc, gen_error
+    sum_term.pop(0)
+
+    return train_acc, gen_error, sum_term
 
 
 def make_mnist_alexnet():
@@ -151,7 +170,15 @@ if __name__ == '__main__':
     fig2ax.set_ylabel('Generalization Error')
     fig2.suptitle('generalization error (lr=' + str(lr) + ')')
 
+    # initialize figure 2 (gen error bound)
+    fig3 = plt.figure()
+    fig3ax = fig3.add_subplot()
+    fig3ax.set_xlabel('Step')
+    fig3ax.set_ylabel('Empirical Bound')
+    fig3.suptitle('generalization error bound (lr=' + str(lr) + ')')
+
     for p in [0.00, 0.50]:
+        print("Running for p = "+str(p))
 
         # configure datasets and dataloaders
         trainset = get_MNIST(noise=p, size=dataset_size, train=True)
@@ -165,14 +192,19 @@ if __name__ == '__main__':
         criterion = nn.CrossEntropyLoss()
 
         # train and plot
-        train_acc, gen_error = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+        train_acc, gen_error, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
         fig2ax.plot(range(epochs), gen_error, label='p='+str(p))
+        coef = 8.12/dataset_size * lr/math.sqrt(variance)
+        fig3ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
 
     if not os.path.exists('results/'+experiment_name):
         os.mkdir('results/'+experiment_name)
+
     fig1ax.legend()
     fig2ax.legend()
-    fig1.savefig('results/'+experiment_name+'/mnist_experiment_train_accuracy.png')
-    fig2.savefig('results/'+experiment_name+'/mnist_experiment_gen_error.png')
+    fig3ax.legend()
+    fig1.savefig('results/'+experiment_name+'/train_accuracy.png')
+    fig2.savefig('results/'+experiment_name+'/gen_error.png')
+    fig3.savefig('results/'+experiment_name+'/gen_error_bound.png')
 
