@@ -6,52 +6,70 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torchvision
 from torchvision import transforms
-# from sgld_optimizer import NewSGLD
+from sgld_optimizer import NewSGLD
 from torch.utils.data import Subset
+import os
 
 
 class NoisyMNIST(torchvision.datasets.MNIST):
-    def __init__(self, p, train):
-        super(NoisyMNIST, self).__init__(root='./data', train=train, download=True,
-                                         transform=transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor()]))
+    def __init__(self, noise, size):
+        super(NoisyMNIST, self).__init__(root='./data', train=True, download=True,
+                                         transform=transforms.Compose([transforms.Resize((32, 32)),
+                                                                       transforms.ToTensor()]))
 
         self.newlabels = {}
-        if train:
-            indices = torch.randperm(60000)[:int(p*60000)].tolist()
-            for idx in indices:
-                self.newlabels[idx] = int(random.random()*10)
+        indices = torch.randperm(size)[:int(noise*size)].tolist()
+        for idx in indices:
+            self.newlabels[idx] = int(random.random()*10)
 
     def __getitem__(self, idx):
         img, label = super(NoisyMNIST, self).__getitem__(idx)
         return img, self.newlabels.get(idx, label)
 
 
-def train_model(model, optimizer, criterion, train_loader, epochs):
+def get_MNIST(noise=0.0, size=60000, train=True):
+    if train:
+        return Subset(NoisyMNIST(noise, size), range(size))
+    else:
+        return torchvision.datasets.MNIST(root='./data', train=False, download=True,
+                                          transform=transforms.Compose([transforms.Resize((32, 32)),
+                                                                        transforms.ToTensor()]))
+
+
+def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
     train_acc = []
-    train_loss = []
+    gen_error = []
 
     for epoch in range(epochs):
-        print(epoch)
 
         # train
         model.train()
-        total_loss = 0
         correct = 0
         for i, (inputs, labels) in enumerate(train_loader):
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-            total_loss += loss.item() * inputs.size(0)
             loss.backward()
             optimizer.step()
             predictions = torch.argmax(outputs, dim=1)
             for j in range(len(predictions)):
                 if predictions[j] == labels[j]:
                     correct += 1
-        train_loss.append(total_loss / len(train_loader.dataset))
         train_acc.append(correct / len(train_loader.dataset))
 
-    return train_acc, train_loss
+        # test
+        model.eval()
+        correct = 0
+        with torch.no_grad():
+            for inputs, labels in test_loader:
+                predictions = torch.argmax(model(inputs), dim=1)
+                for j in range(len(predictions)):
+                    if predictions[j] == labels[j]:
+                        correct += 1
+        test_acc = correct / len(test_loader.dataset)
+        gen_error.append(train_acc[-1] - test_acc)
+
+    return train_acc, gen_error
 
 
 def make_mnist_alexnet():
@@ -80,27 +98,37 @@ def make_mnist_alexnet():
 
 if __name__ == '__main__':
 
+    # make necessary subdirectories
+    if not os.path.exists('results'):
+        os.mkdir('results')
+
     # initialize device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
     # read in arguments
     parser = argparse.ArgumentParser(description='Model Parameters')
-    parser.add_argument('--optim', type=str, default='both',
-                        help='optimizer', choices=['SGD', 'SGLD', 'both'])
     parser.add_argument('--lr', type=float, default=0.05,
                         help='learning rate')
-    parser.add_argument('--batch_size', type=int, default=250,
+    parser.add_argument('--var', type=float, default=0.0,
+                        help='langevin noise variance')
+    parser.add_argument('--batch_size', type=int, default=500,
                         help='minibatch size for training and testing')
+    parser.add_argument('--dataset_size', type=int, default=60000,
+                        help='subset of MNIST used')
     parser.add_argument('--epochs', type=int, default=150,
                         help='number of epochs for training')
+    parser.add_argument('--experiment_name', type=str, default='default',
+                        help='name of folder to save the results')
     args = parser.parse_args()
     print(args)
 
-    optim = args.optim
     batch_size = args.batch_size
     epochs = args.epochs
     lr = args.lr
+    variance = args.var
+    dataset_size = args.dataset_size
+    experiment_name = args.experiment_name
 
     seed = 1
     torch.manual_seed(seed)
@@ -116,25 +144,35 @@ if __name__ == '__main__':
     fig1ax.set_ylabel('Accuracy')
     fig1.suptitle('train accuracy (lr=' + str(lr) + ')')
 
+    # initialize figure 2 (gen error)
+    fig2 = plt.figure()
+    fig2ax = fig2.add_subplot()
+    fig2ax.set_xlabel('Epoch')
+    fig2ax.set_ylabel('Generalization Error')
+    fig2.suptitle('generalization error (lr=' + str(lr) + ')')
+
     for p in [0.00, 0.50]:
 
         # configure datasets and dataloaders
-        trainset = NoisyMNIST(p, train=True)
-        testset = NoisyMNIST(p, train=False)
-        #trainset = Subset(trainset, range(5000))
+        trainset = get_MNIST(noise=p, size=dataset_size, train=True)
+        testset = get_MNIST(train=False)
         train_loader, _, test_loader = data.getDataloader(trainset, testset, validation_size, batch_size, num_workers)
 
         # initialize stuff for our algorithm
         model = make_mnist_alexnet().to(device)
-        #optimizer = NewSGLD(model.parameters(), lr=lr)
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+        optimizer = NewSGLD(model.parameters(), lr=lr, variance=variance)
         scheduler = None
         criterion = nn.CrossEntropyLoss()
 
         # train and plot
-        train_acc, train_loss = train_model(model, optimizer, criterion, train_loader, epochs)
+        train_acc, gen_error = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
+        fig2ax.plot(range(epochs), gen_error, label='p='+str(p))
 
+    if not os.path.exists('results/'+experiment_name):
+        os.mkdir('results/'+experiment_name)
     fig1ax.legend()
-    fig1.savefig('results/mnist_experiment_train_accuracy.png')
+    fig2ax.legend()
+    fig1.savefig('results/'+experiment_name+'/mnist_experiment_train_accuracy.png')
+    fig2.savefig('results/'+experiment_name+'/mnist_experiment_gen_error.png')
 
