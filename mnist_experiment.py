@@ -101,8 +101,11 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
 
             with open(path + '_plotdata.txt', "w") as file:
                 file.write(str(epoch+1))
+                file.write('\n')
                 file.write(''.join([str(x)+' ' for x in train_acc]))
+                file.write('\n')
                 file.write(''.join([str(x)+' ' for x in gen_error]))
+                file.write('\n')
                 file.write(''.join([str(x)+' ' for x in sum_term]))
 
     sum_term.pop(0)
@@ -229,7 +232,7 @@ if __name__ == '__main__':
     fig1ax.legend()
     fig2ax.legend()
     fig3ax.legend()
-    fig1.savefig('results/'+experiment_name+'/train_accuracy.png')
-    fig2.savefig('results/'+experiment_name+'/gen_error.png')
-    fig3.savefig('results/'+experiment_name+'/gen_error_bound.png')
+    fig1.savefig('experiments/'+experiment_name+'/train_accuracy.png')
+    fig2.savefig('experiments/'+experiment_name+'/gen_error.png')
+    fig3.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
 
