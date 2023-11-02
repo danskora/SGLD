@@ -38,25 +38,34 @@ def get_MNIST(noise=0.0, size=60000, train=True):
 
 
 def g_e(model, optimizer, criterion, dataset):
-    indices = torch.randperm(len(dataset))[:200].tolist()
-    total = 0
-    for idx in indices:
-        datapoint, label = dataset[idx]
-        datapoint.unsqueeze_(0)
-        optimizer.zero_grad()
-        loss = criterion(model(datapoint), torch.tensor([label]))
-        loss.backward()
-        for p in model.parameters():
-            total += torch.sum(torch.mul(p.grad, p.grad))
-    return total/200
+    # indices = torch.randperm(len(dataset))[:200].tolist()
+    # total = 0
+    # for idx in indices:
+    #     datapoint, label = dataset[idx]
+    #     datapoint.unsqueeze_(0)
+    #     optimizer.zero_grad()
+    #     loss = criterion(model(datapoint), torch.tensor([label]))
+    #     loss.backward()
+    #     for p in model.parameters():
+    #         total += torch.sum(torch.mul(p.grad, p.grad))
+    # return total/200
+    return 1
 
 
-def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
-    train_acc = []
-    gen_error = []
-    sum_term = [0]
+def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path):
 
-    for epoch in range(epochs):
+    with open(path + '_plotdata.txt', "r") as file:
+        progress = int(next(file))
+        if progress == 0:
+            train_acc = []
+            gen_error = []
+            sum_term = [0]
+        else:
+            train_acc = [float(x) for x in next(file).split()]
+            gen_error = [float(x) for x in next(file).split()]
+            sum_term = [float(x) for x in next(file).split()]
+
+    for epoch in range(progress, epochs, 1):
 
         # train
         model.train()
@@ -85,6 +94,16 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
                         correct += 1
         test_acc = correct / len(test_loader.dataset)
         gen_error.append(train_acc[-1] - test_acc)
+
+        # checkpoint
+        if epoch % 50 == 49:
+            torch.save(model.state_dict(), path + '_modelinfo.pt')
+
+            with open(path + '_plotdata.txt', "w") as file:
+                file.write(str(epoch+1))
+                file.write(''.join([str(x)+' ' for x in train_acc]))
+                file.write(''.join([str(x)+' ' for x in gen_error]))
+                file.write(''.join([str(x)+' ' for x in sum_term]))
 
     sum_term.pop(0)
 
@@ -116,10 +135,6 @@ def make_mnist_alexnet():
 
 
 if __name__ == '__main__':
-
-    # make necessary subdirectories
-    if not os.path.exists('results'):
-        os.mkdir('results')
 
     # initialize device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -156,6 +171,12 @@ if __name__ == '__main__':
     validation_size = 0
     num_workers = 1
 
+    # make necessary subdirectories
+    if not os.path.exists('experiments'):
+        os.mkdir('experiments')
+    if not os.path.exists('experiments/' + experiment_name):
+        os.mkdir('experiments/' + experiment_name)
+
     # initialize figure 1 (train acc)
     fig1 = plt.figure()
     fig1ax = fig1.add_subplot()
@@ -191,15 +212,19 @@ if __name__ == '__main__':
         scheduler = None
         criterion = nn.CrossEntropyLoss()
 
+        path = 'experiments/' + experiment_name + '/noise' + str(p)
+        try:
+            model.load_state_dict(torch.load(path + '_modelinfo.pt'))
+        except:
+            with open(path + '_plotdata.txt', "w") as file:
+                file.write('0')
+
         # train and plot
-        train_acc, gen_error, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+        train_acc, gen_error, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
         fig2ax.plot(range(epochs), gen_error, label='p='+str(p))
         coef = 8.12/dataset_size * lr/math.sqrt(variance)
         fig3ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
-
-    if not os.path.exists('results/'+experiment_name):
-        os.mkdir('results/'+experiment_name)
 
     fig1ax.legend()
     fig2ax.legend()
