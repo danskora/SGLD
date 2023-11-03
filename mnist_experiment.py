@@ -38,18 +38,17 @@ def get_MNIST(noise=0.0, size=60000, train=True):
 
 
 def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
-    # indices = torch.randperm(len(dataset))[:200].tolist()
-    # total = 0
-    # for idx in indices:
-    #     datapoint, label = dataset[idx]
-    #     datapoint.unsqueeze_(0)
-    #     optimizer.zero_grad()
-    #     loss = criterion(model(datapoint), torch.tensor([label]))
-    #     loss.backward()
-    #     for p in model.parameters():
-    #         total += torch.sum(torch.mul(p.grad, p.grad))
-    # return total/200
-    return 1
+    indices = torch.randperm(len(dataset))[:200].tolist()
+    total = 0
+    for idx in indices:
+        datapoint, label = dataset[idx]
+        datapoint.unsqueeze_(0)
+        optimizer.zero_grad()
+        loss = criterion(model(datapoint), torch.tensor([label]))
+        loss.backward()
+        for p in model.parameters():
+            total += torch.sum(torch.mul(p.grad, p.grad))
+    return total/200
 
 
 def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path):
@@ -208,7 +207,8 @@ if __name__ == '__main__':
         # configure datasets and dataloaders
         trainset = get_MNIST(noise=p, size=dataset_size, train=True)
         testset = get_MNIST(train=False)
-        train_loader, _, test_loader = data.getDataloader(trainset, testset, validation_size, batch_size, num_workers)
+        train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
+        test_loader = torch.utils.data.DataLoader(trainset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
         model = make_mnist_alexnet().to(device)

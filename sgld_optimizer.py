@@ -43,7 +43,7 @@ class NewSGLD(Optimizer):
                 if p.grad is None:
                     continue
 
-                gradient = p.grad.data
+                gradient = p.grad.data  # is this correct
                 size = gradient.size()
                 noise = Normal(torch.zeros(size), torch.ones(size) * self.variance)
                 gradient_w_noise = gradient + noise.sample()

@@ -123,7 +123,7 @@ if __name__ == '__main__':
                                               transform=transforms.Compose([transforms.Resize((32, 32)),
                                                                             transforms.ToTensor()]))
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
-        test_loader = torch.utils.data.DataLoader(trainset, batch_size=1, num_workers=num_workers)  # unused
+        test_loader = torch.utils.data.DataLoader(trainset, batch_size=1, num_workers=num_workers)  # use for g_e
 
         for b in range(parameter_samples):
 
