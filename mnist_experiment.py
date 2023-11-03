@@ -37,7 +37,7 @@ def get_MNIST(noise=0.0, size=60000, train=True):
                                                                         transforms.ToTensor()]))
 
 
-def g_e(model, optimizer, criterion, dataset):
+def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
     # indices = torch.randperm(len(dataset))[:200].tolist()
     # total = 0
     # for idx in indices:
@@ -107,6 +107,7 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
                 file.write(''.join([str(x)+' ' for x in gen_error]))
                 file.write('\n')
                 file.write(''.join([str(x)+' ' for x in sum_term]))
+                file.write('\n')
 
     sum_term.pop(0)
 
@@ -147,7 +148,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Model Parameters')
     parser.add_argument('--lr', type=float, default=0.05,
                         help='learning rate')
-    parser.add_argument('--var', type=float, default=0.0,
+    parser.add_argument('--var', type=float, default=0.000001,
                         help='langevin noise variance')
     parser.add_argument('--batch_size', type=int, default=500,
                         help='minibatch size for training and testing')
@@ -220,7 +221,7 @@ if __name__ == '__main__':
             model.load_state_dict(torch.load(path + '_modelinfo.pt'))
         except:
             with open(path + '_plotdata.txt', "w") as file:
-                file.write('0')
+                file.write('0\n')
 
         # train and plot
         train_acc, gen_error, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
