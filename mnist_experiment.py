@@ -13,8 +13,8 @@ import math
 
 
 class NoisyMNIST(torchvision.datasets.MNIST):
-    def __init__(self, noise, size):
-        super(NoisyMNIST, self).__init__(root='./data', train=True, download=True,
+    def __init__(self, noise, size, train):
+        super(NoisyMNIST, self).__init__(root='./data', train=train, download=True,
                                          transform=transforms.Compose([transforms.Resize((32, 32)),
                                                                        transforms.ToTensor()]))
 
@@ -28,13 +28,14 @@ class NoisyMNIST(torchvision.datasets.MNIST):
         return img, self.newlabels.get(idx, label)
 
 
-def get_MNIST(noise=0.0, size=60000, train=True):
-    if train:
-        return Subset(NoisyMNIST(noise, size), range(size))
+def get_MNIST(noise=0.0, size=None, train=True):
+    if size:
+        return Subset(NoisyMNIST(noise, size, train), range(size))
     else:
-        return torchvision.datasets.MNIST(root='./data', train=False, download=True,
-                                          transform=transforms.Compose([transforms.Resize((32, 32)),
-                                                                        transforms.ToTensor()]))
+        if train:
+            return NoisyMNIST(noise, 60000, True)
+        else:
+            return NoisyMNIST(noise, 10000, False)
 
 
 def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
@@ -194,7 +195,7 @@ if __name__ == '__main__':
     fig2ax.set_ylabel('Generalization Error')
     fig2.suptitle('generalization error (lr=' + str(lr) + ')')
 
-    # initialize figure 2 (gen error bound)
+    # initialize figure 3 (gen error bound)
     fig3 = plt.figure()
     fig3ax = fig3.add_subplot()
     fig3ax.set_xlabel('Step')
@@ -206,7 +207,7 @@ if __name__ == '__main__':
 
         # configure datasets and dataloaders
         trainset = get_MNIST(noise=p, size=dataset_size, train=True)
-        testset = get_MNIST(train=False)
+        testset = get_MNIST(noise=p, train=False)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
         test_loader = torch.utils.data.DataLoader(trainset, batch_size=1000, num_workers=num_workers)
 
@@ -227,7 +228,7 @@ if __name__ == '__main__':
         train_acc, gen_error, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
         fig2ax.plot(range(epochs), gen_error, label='p='+str(p))
-        coef = 8.12/dataset_size * lr/math.sqrt(variance)
+        coef = 8.12/dataset_size * lr/math.sqrt(variance)  # depends on whether stochastic or not
         fig3ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
 
     fig1ax.legend()
