@@ -58,11 +58,11 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
         progress = int(next(file))
         if progress == 0:
             train_acc = []
-            gen_error = []
+            test_acc = []
             sum_term = [0]
         else:
             train_acc = [float(x) for x in next(file).split()]
-            gen_error = [float(x) for x in next(file).split()]
+            test_acc = [float(x) for x in next(file).split()]
             sum_term = [float(x) for x in next(file).split()]
 
     for epoch in range(progress, epochs, 1):
@@ -92,8 +92,7 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
                 for j in range(len(predictions)):
                     if predictions[j] == labels[j]:
                         correct += 1
-        test_acc = correct / len(test_loader.dataset)
-        gen_error.append(train_acc[-1] - test_acc)
+        test_acc.append(correct / len(test_loader.dataset))
 
         # checkpoint
         if epoch % 50 == 49:
@@ -104,14 +103,14 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
                 file.write('\n')
                 file.write(''.join([str(x)+' ' for x in train_acc]))
                 file.write('\n')
-                file.write(''.join([str(x)+' ' for x in gen_error]))
+                file.write(''.join([str(x)+' ' for x in test_acc]))
                 file.write('\n')
                 file.write(''.join([str(x)+' ' for x in sum_term]))
                 file.write('\n')
 
     sum_term.pop(0)
 
-    return train_acc, gen_error, sum_term
+    return train_acc, test_acc, sum_term
 
 
 def make_mnist_alexnet():
@@ -188,19 +187,28 @@ if __name__ == '__main__':
     fig1ax.set_ylabel('Accuracy')
     fig1.suptitle('train accuracy (lr=' + str(lr) + ')')
 
-    # initialize figure 2 (gen error)
+    # initialize figure 2 (test acc)
     fig2 = plt.figure()
     fig2ax = fig2.add_subplot()
     fig2ax.set_xlabel('Epoch')
-    fig2ax.set_ylabel('Generalization Error')
-    fig2.suptitle('generalization error (lr=' + str(lr) + ')')
+    fig2ax.set_ylabel('Accuracy')
+    fig2.suptitle('test accuracy (lr=' + str(lr) + ')')
 
-    # initialize figure 3 (gen error bound)
+    # initialize figure 3 (gen error)
     fig3 = plt.figure()
     fig3ax = fig3.add_subplot()
-    fig3ax.set_xlabel('Step')
-    fig3ax.set_ylabel('Empirical Bound')
-    fig3.suptitle('generalization error bound (lr=' + str(lr) + ')')
+    fig3ax.set_xlabel('Epoch')
+    fig3ax.set_ylabel('Generalization Error')
+    fig3.suptitle('generalization error (lr=' + str(lr) + ')')
+
+    # initialize figure 4 (gen error bound)
+    fig4 = plt.figure()
+    fig4ax = fig4.add_subplot()
+    fig4ax.set_xlabel('Step')
+    fig4ax.set_ylabel('Empirical Bound')
+    fig4.suptitle('generalization error bound (lr=' + str(lr) + ')')
+
+    # eventually we should remove discrepancy between "steps" and "epochs" and bound test accuracy/loss directly
 
     for p in [0.00, 0.50]:
         print("Running for p = "+str(p))
@@ -225,16 +233,19 @@ if __name__ == '__main__':
                 file.write('0\n')
 
         # train and plot
-        train_acc, gen_error, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
+        train_acc, test_acc, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
-        fig2ax.plot(range(epochs), gen_error, label='p='+str(p))
+        fig2ax.plot(range(epochs), test_acc, label='p='+str(p))
+        fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
         coef = 8.12/dataset_size * lr/math.sqrt(variance)  # depends on whether stochastic or not
-        fig3ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
+        fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
 
     fig1ax.legend()
     fig2ax.legend()
     fig3ax.legend()
+    fig4ax.legend()
     fig1.savefig('experiments/'+experiment_name+'/train_accuracy.png')
-    fig2.savefig('experiments/'+experiment_name+'/gen_error.png')
-    fig3.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
+    fig2.savefig('experiments/'+experiment_name+'/test_accuracy.png')
+    fig3.savefig('experiments/'+experiment_name+'/gen_error.png')
+    fig4.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
 
