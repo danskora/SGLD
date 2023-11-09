@@ -128,7 +128,7 @@ if __name__ == '__main__':
         for b in range(parameter_samples):
 
             model = make_mnist_alexnet().to(device)
-            optimizer = NewSGLD(model.parameters(), lr=lr, variance=variance)
+            optimizer = NewSGLD(model.parameters(), lr=lr, variance=variance, device=device)
             scheduler = None
             criterion = nn.CrossEntropyLoss()
 
