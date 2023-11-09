@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#SBATCH -J fig3def_tweaked
+#SBATCH -p gpu
+#SBATCH -o output_%j.txt
+#SBATCH -e errortrace_%j.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=danskora@iu.edu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-task=1
+#SBATCH --mem=32G
+#SBATCH --time=48:00:00
+#SBATCH -A r00189
+
+python mnist_experiment.py --experiment_name fig3def_tweaked --epochs 3000 --batch_size 500  --lr 0.005 --var 0.0000000002 --dataset_size 5000
