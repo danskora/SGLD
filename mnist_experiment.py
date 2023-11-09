@@ -48,7 +48,7 @@ def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should
         loss = criterion(model(datapoint), torch.tensor([label]))
         loss.backward()
         for p in model.parameters():
-            total += torch.sum(torch.mul(p.grad, p.grad))
+            total += torch.sum(p.grad ** 2)
     return total/200
 
 
@@ -143,20 +143,28 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
-    # read in arguments
     parser = argparse.ArgumentParser(description='Model Parameters')
+
+    # training parameters
     parser.add_argument('--lr', type=float, default=0.05,
                         help='learning rate')
     parser.add_argument('--var', type=float, default=0.000001,
                         help='langevin noise variance')
     parser.add_argument('--batch_size', type=int, default=500,
                         help='minibatch size for training and testing')
-    parser.add_argument('--dataset_size', type=int, default=60000,
-                        help='subset of MNIST used')
     parser.add_argument('--epochs', type=int, default=150,
                         help='number of epochs for training')
+
+    # experiment conditions
+    parser.add_argument('--dataset_size', type=int, default=60000,
+                        help='subset of dataset used')
+    parser.add_argument('--noise', type=float, action='append',
+                        help='amount of noise to add to labels')
+
+    # experiment name
     parser.add_argument('--experiment_name', type=str, default='default',
                         help='name of folder to save the results')
+
     args = parser.parse_args()
     print(args)
 
@@ -165,6 +173,7 @@ if __name__ == '__main__':
     lr = args.lr
     variance = args.var
     dataset_size = args.dataset_size
+    noise = args.noise if args.noise else [0.0, 0.5]
     experiment_name = args.experiment_name
 
     seed = 1
@@ -185,32 +194,41 @@ if __name__ == '__main__':
     fig1ax = fig1.add_subplot()
     fig1ax.set_xlabel('Epoch')
     fig1ax.set_ylabel('Accuracy')
-    fig1.suptitle('train accuracy (lr=' + str(lr) + ')')
+    fig1.suptitle('Train Accuracy')
 
     # initialize figure 2 (test acc)
     fig2 = plt.figure()
     fig2ax = fig2.add_subplot()
     fig2ax.set_xlabel('Epoch')
     fig2ax.set_ylabel('Accuracy')
-    fig2.suptitle('test accuracy (lr=' + str(lr) + ')')
+    fig2.suptitle('Test Accuracy')
 
     # initialize figure 3 (gen error)
     fig3 = plt.figure()
     fig3ax = fig3.add_subplot()
     fig3ax.set_xlabel('Epoch')
     fig3ax.set_ylabel('Generalization Error')
-    fig3.suptitle('generalization error (lr=' + str(lr) + ')')
+    fig3.suptitle('Generalization Error\n'+r'$\mathcal{L}(\hat{w}, \mathcal{D}) - \mathcal{L}(\hat{w}, S)$')
 
     # initialize figure 4 (gen error bound)
     fig4 = plt.figure()
     fig4ax = fig4.add_subplot()
     fig4ax.set_xlabel('Step')
     fig4ax.set_ylabel('Empirical Bound')
-    fig4.suptitle('generalization error bound (lr=' + str(lr) + ')')
+    fig4.suptitle('Bound on Expected Generalization Error')
+
+    # initialize figures corresponding to each noise value
+    p_to_fig = {}
+    for p in noise:
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        ax.set_xlabel('Step')
+        fig.suptitle('noise = ' + str(p))
+        p_to_fig[p] = (fig, ax)
 
     # eventually we should remove discrepancy between "steps" and "epochs" and bound test accuracy/loss directly
 
-    for p in [0.00, 0.50]:
+    for p in noise:
         print("Running for p = "+str(p))
 
         # configure datasets and dataloaders
@@ -232,13 +250,22 @@ if __name__ == '__main__':
             with open(path + '_plotdata.txt', "w") as file:
                 file.write('0\n')
 
-        # train and plot
+        # train
         train_acc, test_acc, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
+
+        # plot
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
         fig2ax.plot(range(epochs), test_acc, label='p='+str(p))
         fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
         coef = 8.12/dataset_size * lr/math.sqrt(variance)  # depends on whether stochastic or not
         fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
+        fig, ax = p_to_fig[p]
+        batches = (dataset_size - 1) // batch_size + 1
+        ax.plot(range(batches-1, epochs*batches, batches), train_acc, label='train accuracy')
+        ax.plot(range(batches-1, epochs*batches, batches), [abs(a-b) for a, b in zip(train_acc, test_acc)], label=r'|$err_{gen}(S)$|')
+        ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label=r'$err_{gen}$ bound')
+        ax.legend()
+        fig.savefig('experiments/' + experiment_name + '/noise' + str(p) + '.png')
 
     fig1ax.legend()
     fig2ax.legend()
