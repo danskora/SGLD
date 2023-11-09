@@ -48,7 +48,7 @@ def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should
         loss = criterion(model(datapoint), torch.tensor([label]))
         loss.backward()
         for p in model.parameters():
-            total += torch.sum(p.grad ** 2)
+            total += torch.sum(p.grad ** 2).item()
     return total/200
 
 
@@ -70,7 +70,9 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
         # train
         model.train()
         correct = 0
-        for i, (inputs, labels) in enumerate(train_loader):
+        for i, (_inputs, _labels) in enumerate(train_loader):
+            inputs = _inputs.to(device)
+            labels = _labels.to(device)
             sum_term.append(sum_term[-1] + g_e(model, optimizer, criterion, train_loader.dataset))
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -87,7 +89,9 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
         model.eval()
         correct = 0
         with torch.no_grad():
-            for inputs, labels in test_loader:
+            for _inputs, _labels in test_loader:
+                inputs = _inputs.to(device)
+                labels = _labels.to(device)
                 predictions = torch.argmax(model(inputs), dim=1)
                 for j in range(len(predictions)):
                     if predictions[j] == labels[j]:
