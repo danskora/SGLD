@@ -52,20 +52,13 @@ def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should
     return total/200
 
 
-def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path):
+def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
 
-    with open(path + '_plotdata.txt', "r") as file:
-        progress = int(next(file))
-        if progress == 0:
-            train_acc = []
-            test_acc = []
-            sum_term = [0]
-        else:
-            train_acc = [float(x) for x in next(file).split()]
-            test_acc = [float(x) for x in next(file).split()]
-            sum_term = [float(x) for x in next(file).split()]
+    train_acc = []
+    test_acc = []
+    sum_term = [0]
 
-    for epoch in range(progress, epochs, 1):
+    for epoch in range(epochs):
 
         # train
         model.train()
@@ -97,20 +90,6 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs, 
                     if predictions[j] == labels[j]:
                         correct += 1
         test_acc.append(correct / len(test_loader.dataset))
-
-        # checkpoint
-        if epoch % 50 == 49:
-            torch.save(model.state_dict(), path + '_modelinfo.pt')
-
-            with open(path + '_plotdata.txt', "w") as file:
-                file.write(str(epoch+1))
-                file.write('\n')
-                file.write(''.join([str(x)+' ' for x in train_acc]))
-                file.write('\n')
-                file.write(''.join([str(x)+' ' for x in test_acc]))
-                file.write('\n')
-                file.write(''.join([str(x)+' ' for x in sum_term]))
-                file.write('\n')
 
     sum_term.pop(0)
 
@@ -147,7 +126,7 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
-    parser = argparse.ArgumentParser(description='Model Parameters')
+    parser = argparse.ArgumentParser(description='...')
 
     # training parameters
     parser.add_argument('--lr', type=float, default=0.05,
@@ -247,15 +226,8 @@ if __name__ == '__main__':
         scheduler = None
         criterion = nn.CrossEntropyLoss()
 
-        path = 'experiments/' + experiment_name + '/noise' + str(p)
-        try:
-            model.load_state_dict(torch.load(path + '_modelinfo.pt'))
-        except:
-            with open(path + '_plotdata.txt', "w") as file:
-                file.write('0\n')
-
         # train
-        train_acc, test_acc, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs, path)
+        train_acc, test_acc, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
 
         # plot
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
