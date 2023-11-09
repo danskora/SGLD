@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH -J gputest
-#SBATCH -p gpu-debug
+#SBATCH -J fig3def
+#SBATCH -p gpu
 #SBATCH -o output_%j.txt
 #SBATCH -e errortrace_%j.err
 #SBATCH --mail-type=ALL
@@ -9,10 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=1
-#SBATCH --time=00:05:00
-#SBATCH --mem=2G
+#SBATCH --time=48:00:00
 #SBATCH -A r00189
 
-module load python/gpu/3.10.5
-
-python mnist_experiment.py --experiment_name gputest --epochs 500 --batch_size 500 --lr 0.01 --var 0.000004
+python mnist_experiment.py --experiment_name fig3def --epochs 3000 --batch_size 500  --lr 0.0005 --var 0.000000000002 --dataset_size 5000
