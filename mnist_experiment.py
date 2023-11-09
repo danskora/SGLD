@@ -45,7 +45,7 @@ def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should
         datapoint, label = dataset[idx]
         datapoint.unsqueeze_(0)
         optimizer.zero_grad()
-        loss = criterion(model(datapoint), torch.tensor([label]))
+        loss = criterion(model(datapoint.to(device)), torch.tensor([label], device=device))
         loss.backward()
         for p in model.parameters():
             total += torch.sum(p.grad ** 2).item()
