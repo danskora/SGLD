@@ -51,6 +51,8 @@ def get_dataset(dataset, noise=0.0, size=None, train=True):
         d = NoisyMNIST
     elif dataset == 'CIFAR10':
         d = NoisyCIFAR10
+    else:
+        raise NotImplementedError
 
     if size:
         return Subset(d(noise, size, train), range(size))
@@ -190,7 +192,7 @@ if __name__ == '__main__':
     variance = args.var
     batch_size = args.batch_size
     epochs = args.epochs
-    model = args.model
+    model_cfg = args.model
     dataset = args.dataset
     dataset_size = args.dataset_size
     noise = args.noise if args.noise else [0.0, 0.5]
@@ -266,10 +268,12 @@ if __name__ == '__main__':
         test_loader = torch.utils.data.DataLoader(trainset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
-        if model == 'MLP':
+        if model_cfg == 'MLP':
             model = make_mlp().to(device)
-        elif model == 'AlexNet':
+        elif model_cfg == 'AlexNet':
             model = make_alexnet(channels).to(device)
+        else:
+            raise NotImplementedError
         optimizer = NewSGLD(model.parameters(), lr=lr, variance=variance, device=device)
         scheduler = None
         criterion = nn.CrossEntropyLoss()
