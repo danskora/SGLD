@@ -13,10 +13,11 @@ import math
 
 
 class NoisyMNIST(torchvision.datasets.MNIST):
-    def __init__(self, noise, size, train):
+    def __init__(self, noise, size=None, train=True):
+        if not size:
+            size = 60000 if train else 10000
         super(NoisyMNIST, self).__init__(root='./data', train=train, download=True,
-                                         transform=transforms.Compose([transforms.Resize((32, 32)),
-                                                                       transforms.ToTensor()]))
+                                         transform=transforms.ToTensor())
 
         self.newlabels = {}
         indices = torch.randperm(size)[:int(noise*size)].tolist()
@@ -28,14 +29,33 @@ class NoisyMNIST(torchvision.datasets.MNIST):
         return img, self.newlabels.get(idx, label)
 
 
-def get_MNIST(noise=0.0, size=None, train=True):
+class NoisyCIFAR10(torchvision.datasets.CIFAR10):
+    def __init__(self, noise, size=None, train=True):
+        if not size:
+            size = 50000 if train else 10000
+        super(NoisyCIFAR10, self).__init__(root='./data', train=train, download=True,
+                                           transform=transforms.ToTensor())
+
+        self.newlabels = {}
+        indices = torch.randperm(size)[:int(noise*size)].tolist()
+        for idx in indices:
+            self.newlabels[idx] = int(random.random()*10)
+
+    def __getitem__(self, idx):
+        img, label = super(NoisyCIFAR10, self).__getitem__(idx)
+        return img, self.newlabels.get(idx, label)
+
+
+def get_dataset(dataset, noise=0.0, size=None, train=True):
+    if dataset == 'MNIST':
+        d = NoisyMNIST
+    elif dataset == 'CIFAR10':
+        d = NoisyCIFAR10
+
     if size:
-        return Subset(NoisyMNIST(noise, size, train), range(size))
+        return Subset(d(noise, size, train), range(size))
     else:
-        if train:
-            return NoisyMNIST(noise, 60000, True)
-        else:
-            return NoisyMNIST(noise, 10000, False)
+        return d(noise, train=train)
 
 
 def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
@@ -97,27 +117,37 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
     return train_acc, test_acc, g_e
 
 
-def make_mnist_alexnet():
-    act = torch.nn.SiLU
+def make_alexnet(n_channels):
+    act = torch.nn.ReLU
     return nn.Sequential(
-        nn.Conv2d(1, 64, kernel_size=3, padding=1),
+        nn.Conv2d(n_channels, 64, kernel_size=5),
         act(),
-        nn.MaxPool2d(2, stride=2, padding=0),
-        nn.Conv2d(64, 128, kernel_size=3, padding=1),
+        nn.MaxPool2d(kernel_size=3),
         act(),
-        nn.MaxPool2d(2, stride=2, padding=0),
-        # nn.Conv2d(128, 256, kernel_size=2, padding="same"),
-        # act(),
-        # nn.Conv2d(256, 128, kernel_size=2, padding="same"),
-        # act(),
-        nn.Conv2d(128, 64, kernel_size=2, padding="same"),
+        nn.Conv2d(64, 192, kernel_size=5),
+        act(),
+        nn.MaxPool2d(kernel_size=3),
         act(),
         nn.Flatten(),
-        nn.Linear(4096, 256),
+        nn.LazyLinear(384),
         act(),
-        nn.Linear(256, 256),
+        nn.Linear(384, 192),
         act(),
-        nn.Linear(256, 10),
+        nn.Linear(192, 10)
+    )
+
+
+def make_mlp():
+    act = torch.nn.ReLU
+    return nn.Sequential(
+        nn.Flatten(),
+        nn.LazyLinear(512),
+        act(),
+        nn.Linear(512, 512),
+        act(),
+        nn.Linear(512, 512),
+        act(),
+        nn.Linear(512, 10)
     )
 
 
@@ -140,6 +170,10 @@ if __name__ == '__main__':
                         help='number of epochs for training')
 
     # experiment conditions
+    parser.add_argument('--model', type=str, default='AlexNet',
+                        help='model type')
+    parser.add_argument('--dataset', type=str, default='MNIST',
+                        help='dataset used')
     parser.add_argument('--dataset_size', type=int, default=60000,
                         help='subset of dataset used')
     parser.add_argument('--noise', type=float, action='append',
@@ -152,10 +186,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    batch_size = args.batch_size
-    epochs = args.epochs
     lr = args.lr
     variance = args.var
+    batch_size = args.batch_size
+    epochs = args.epochs
+    model = args.model
+    dataset = args.dataset
     dataset_size = args.dataset_size
     noise = args.noise if args.noise else [0.0, 0.5]
     experiment_name = args.experiment_name
@@ -218,17 +254,22 @@ if __name__ == '__main__':
 
     # eventually we should remove discrepancy between "steps" and "epochs" and bound test accuracy/loss directly
 
+    channels = 1 if dataset == 'MNIST' else 3
+
     for p in noise:
         print("Running for p = "+str(p))
 
         # configure datasets and dataloaders
-        trainset = get_MNIST(noise=p, size=dataset_size, train=True)
-        testset = get_MNIST(noise=p, train=False)
+        trainset = get_dataset(dataset, noise=p, size=dataset_size, train=True)
+        testset = get_dataset(dataset, noise=p, train=False)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
         test_loader = torch.utils.data.DataLoader(trainset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
-        model = make_mnist_alexnet().to(device)
+        if model == 'MLP':
+            model = make_mlp().to(device)
+        elif model == 'AlexNet':
+            model = make_alexnet(channels).to(device)
         optimizer = NewSGLD(model.parameters(), lr=lr, variance=variance, device=device)
         scheduler = None
         criterion = nn.CrossEntropyLoss()
