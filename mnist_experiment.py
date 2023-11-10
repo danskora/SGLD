@@ -38,7 +38,7 @@ def get_MNIST(noise=0.0, size=None, train=True):
             return NoisyMNIST(noise, 10000, False)
 
 
-def g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
+def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
     indices = torch.randperm(len(dataset))[:200].tolist()
     total = 0
     for idx in indices:
@@ -56,7 +56,7 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
 
     train_acc = []
     test_acc = []
-    sum_term = [0]
+    g_e = []
 
     for epoch in range(epochs):
 
@@ -66,7 +66,7 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
         for i, (_inputs, _labels) in enumerate(train_loader):
             inputs = _inputs.to(device)
             labels = _labels.to(device)
-            sum_term.append(sum_term[-1] + g_e(model, optimizer, criterion, train_loader.dataset))
+            g_e.append(calc_g_e(model, optimizer, criterion, train_loader.dataset))
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -91,9 +91,10 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
                         correct += 1
         test_acc.append(correct / len(test_loader.dataset))
 
-    sum_term.pop(0)
+        if epoch % 100 == 99:
+            print("Completed " + str(epoch+1) + " epochs.")
 
-    return train_acc, test_acc, sum_term
+    return train_acc, test_acc, g_e
 
 
 def make_mnist_alexnet():
@@ -200,6 +201,12 @@ if __name__ == '__main__':
     fig4ax.set_ylabel('Empirical Bound')
     fig4.suptitle('Bound on Expected Generalization Error')
 
+    # initialize figure 5 (g_e)
+    fig5 = plt.figure()
+    fig5ax = fig5.add_subplot()
+    fig5ax.set_xlabel('Step')
+    fig5.suptitle('Average Squared Gradient Norm')
+
     # initialize figures corresponding to each noise value
     p_to_fig = {}
     for p in noise:
@@ -227,7 +234,12 @@ if __name__ == '__main__':
         criterion = nn.CrossEntropyLoss()
 
         # train
-        train_acc, test_acc, sum_term = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+        train_acc, test_acc, g_e = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+
+        sum_term = [0]
+        for e in g_e:
+            sum_term.append(sum_term[-1] + e)
+        sum_term.pop(0)
 
         # plot
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
@@ -235,6 +247,7 @@ if __name__ == '__main__':
         fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
         coef = 8.12/dataset_size * lr/math.sqrt(variance)  # depends on whether stochastic or not
         fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
+        fig5ax.plot(range(len(g_e)), g_e, label='p='+str(p))
         fig, ax = p_to_fig[p]
         batches = (dataset_size - 1) // batch_size + 1
         ax.plot(range(batches-1, epochs*batches, batches), train_acc, label='train accuracy')
@@ -247,8 +260,10 @@ if __name__ == '__main__':
     fig2ax.legend()
     fig3ax.legend()
     fig4ax.legend()
+    fig5ax.legend()
     fig1.savefig('experiments/'+experiment_name+'/train_accuracy.png')
     fig2.savefig('experiments/'+experiment_name+'/test_accuracy.png')
     fig3.savefig('experiments/'+experiment_name+'/gen_error.png')
     fig4.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
+    fig5.savefig('experiments/'+experiment_name+'/average_squared_gradient_norm.png')
 
