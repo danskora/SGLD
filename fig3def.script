@@ -13,4 +13,4 @@
 #SBATCH --time=48:00:00
 #SBATCH -A r00189
 
-python mnist_experiment.py --experiment_name fig3def --epochs 3000 --batch_size 500  --lr 0.0005 --var 0.000000000002 --dataset_size 5000
+python mnist_experiment.py --experiment_name fig3def --dataset_size 5000 --batch_size 500  --var_coef 0.000008 --dataset MNIST --model MLP --exper 3 --lr 0 --epochs 3000
