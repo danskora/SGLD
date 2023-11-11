@@ -1,6 +1,6 @@
 import argparse
 import torch
-import data
+from my_helpers import *
 import random
 import matplotlib.pyplot as plt
 import torch.nn as nn
@@ -164,8 +164,8 @@ if __name__ == '__main__':
     # training parameters
     parser.add_argument('--lr', type=float, default=0.05,
                         help='learning rate')
-    parser.add_argument('--var', type=float, default=0.000001,
-                        help='langevin noise variance')
+    parser.add_argument('--var_coef', type=float, default=0.000001,
+                        help='coefficient of langevin noise variance wrt squared lr')
     parser.add_argument('--batch_size', type=int, default=500,
                         help='minibatch size for training and testing')
     parser.add_argument('--epochs', type=int, default=150,
@@ -180,6 +180,8 @@ if __name__ == '__main__':
                         help='subset of dataset used')
     parser.add_argument('--noise', type=float, action='append',
                         help='amount of noise to add to labels')
+    parser.add_argument('--exper', type=int, default=0,
+                        help='the experiment number we are replicating')
 
     # experiment name
     parser.add_argument('--experiment_name', type=str, default='default',
@@ -189,13 +191,14 @@ if __name__ == '__main__':
     print(args)
 
     lr = args.lr
-    variance = args.var
+    var_coef = args.var_coef
     batch_size = args.batch_size
     epochs = args.epochs
     model_cfg = args.model
     dataset = args.dataset
     dataset_size = args.dataset_size
     noise = args.noise if args.noise else [0.0, 0.5]
+    exper = args.exper
     experiment_name = args.experiment_name
 
     seed = 1
@@ -274,8 +277,13 @@ if __name__ == '__main__':
             model = make_alexnet(channels).to(device)
         else:
             raise NotImplementedError
-        optimizer = NewSGLD(model.parameters(), lr=lr, variance=variance, device=device)
-        scheduler = None
+        optimizer = NewSGLD(model.parameters(), lr=lr, var_coef=var_coef, device=device)
+        if exper == 1:
+            scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
+        elif exper == 2:
+            scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
+        else:
+            scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
         criterion = nn.CrossEntropyLoss()
 
         # train
@@ -290,7 +298,10 @@ if __name__ == '__main__':
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
         fig2ax.plot(range(epochs), test_acc, label='p='+str(p))
         fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
-        coef = 8.12/dataset_size * lr/math.sqrt(variance)  # depends on whether stochastic or not
+        if exper == 3:
+            coef = 8.12 / dataset_size / math.sqrt(var_coef)
+        else:
+            coef = 2 * math.sqrt(2) / dataset_size / math.sqrt(var_coef)
         fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
         fig5ax.plot(range(len(g_e)), g_e, label='p='+str(p))
         fig, ax = p_to_fig[p]
