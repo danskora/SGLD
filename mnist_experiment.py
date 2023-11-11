@@ -74,7 +74,7 @@ def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this s
     return total/200
 
 
-def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
+def train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs):
 
     train_acc = []
     test_acc = []
@@ -94,6 +94,7 @@ def train_model(model, optimizer, criterion, train_loader, test_loader, epochs):
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+            scheduler.step()
             predictions = torch.argmax(outputs, dim=1)
             for j in range(len(predictions)):
                 if predictions[j] == labels[j]:
@@ -287,7 +288,7 @@ if __name__ == '__main__':
         criterion = nn.CrossEntropyLoss()
 
         # train
-        train_acc, test_acc, g_e = train_model(model, optimizer, criterion, train_loader, test_loader, epochs)
+        train_acc, test_acc, g_e = train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs)
 
         sum_term = [0]
         for e in g_e:
