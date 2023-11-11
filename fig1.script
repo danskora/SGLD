@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#SBATCH -J fig1
+#SBATCH -p gpu
+#SBATCH -o output_%j.txt
+#SBATCH -e errortrace_%j.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=danskora@iu.edu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-task=1
+#SBATCH --mem=64G
+#SBATCH --time=96:00:00
+#SBATCH -A r00189
+
+python mnist_experiment.py --experiment_name fig1 --dataset_size 10000 --batch_size 10000  --var_coef 0.08 --dataset MNIST --model MLP --exper 1 --lr 0 --epochs 100000 --noise 0.0 --noise 0.25 --noise 0.50 --noise 0.75
