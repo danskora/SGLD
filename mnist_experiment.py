@@ -48,16 +48,16 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
 
 def get_dataset(dataset, noise=0.0, size=None, train=True):
     if dataset == 'MNIST':
-        d = NoisyMNIST
+        d = NoisyMNIST(noise, size=size, train=train)
     elif dataset == 'CIFAR10':
-        d = NoisyCIFAR10
+        d = NoisyCIFAR10(noise, size=size, train=train)
     else:
         raise NotImplementedError
 
     if size:
-        return Subset(d(noise, size, train), range(size))
+        return Subset(d, range(size))
     else:
-        return d(noise, train=train)
+        return d
 
 
 def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
@@ -269,7 +269,7 @@ if __name__ == '__main__':
         trainset = get_dataset(dataset, noise=p, size=dataset_size, train=True)
         testset = get_dataset(dataset, noise=p, train=False)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
-        test_loader = torch.utils.data.DataLoader(trainset, batch_size=1000, num_workers=num_workers)
+        test_loader = torch.utils.data.DataLoader(testset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
         if model_cfg == 'MLP':
