@@ -2,9 +2,10 @@ import torch
 from torch.distributions import Normal
 from torch.optim import Optimizer
 import numpy as np
+import math
 
 
-class SGLD(Optimizer):
+class SGLD(Optimizer):  # check if this even reflects the original paper or just that blog post
     def __init__(self, params, lr):
         super(SGLD, self).__init__(params, dict(lr=lr))
 
@@ -29,12 +30,12 @@ class SGLD(Optimizer):
 
 # new optimizer to suit the noise variance of the MNIST experiment
 class NewSGLD(Optimizer):
-    def __init__(self, params, lr, var_coef, device):
+    def __init__(self, params, lr, std_coef, device):
         super(NewSGLD, self).__init__(params, {'lr': lr})
-        self.var_coef = var_coef
+        self.std_coef = std_coef
         self.device = device
 
-    def step(self, closure=None):
+    def step(self, closure=None):  # we could totally factor out lr and create the distribution only once, but this looks nicer
         loss = None
 
         for group in self.param_groups:
@@ -46,8 +47,8 @@ class NewSGLD(Optimizer):
                 gradient = p.grad.data  # is this correct
                 size = gradient.size()
                 noise = Normal(torch.zeros(size, device=self.device),
-                               torch.ones(size, device=self.device) * (group['lr'] ** 2) * self.var_coef)
-                gradient_w_noise = gradient + noise.sample()
-                p.data.add_(gradient_w_noise, alpha=-group['lr'])
+                               torch.ones(size, device=self.device) * group['lr'] * self.std_coef / math.sqrt(2))
+                p.data.add_(gradient, alpha=-group['lr'])
+                p.data.add_(noise.sample())
 
         return loss  # what even is this

@@ -165,8 +165,8 @@ if __name__ == '__main__':
     # training parameters
     parser.add_argument('--lr', type=float, default=0.05,
                         help='learning rate')
-    parser.add_argument('--var_coef', type=float, default=0.000001,
-                        help='coefficient of langevin noise variance wrt squared lr')
+    parser.add_argument('--std_coef', type=float, default=0.000001,
+                        help='ratio of langevin noise standard deviation to learning rate (sigma/gamma)')
     parser.add_argument('--batch_size', type=int, default=500,
                         help='minibatch size for training and testing')
     parser.add_argument('--epochs', type=int, default=150,
@@ -192,7 +192,7 @@ if __name__ == '__main__':
     print(args)
 
     lr = args.lr
-    var_coef = args.var_coef
+    std_coef = args.std_coef
     batch_size = args.batch_size
     epochs = args.epochs
     model_cfg = args.model
@@ -278,10 +278,8 @@ if __name__ == '__main__':
             model = make_alexnet(channels).to(device)
         else:
             raise NotImplementedError
-        optimizer = NewSGLD(model.parameters(), lr=lr, var_coef=var_coef, device=device)
-        if exper == 1:
-            scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
-        elif exper == 2:
+        optimizer = NewSGLD(model.parameters(), lr=lr, std_coef=std_coef, device=device)
+        if exper == 2:
             scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
         else:
             scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
@@ -300,9 +298,9 @@ if __name__ == '__main__':
         fig2ax.plot(range(epochs), test_acc, label='p='+str(p))
         fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
         if exper == 3:
-            coef = 8.12 / dataset_size / math.sqrt(var_coef)
+            coef = 8.12 / dataset_size / std_coef
         else:
-            coef = 2 * math.sqrt(2) / dataset_size / math.sqrt(var_coef)
+            coef = 2 * math.sqrt(2) / dataset_size / std_coef
         fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
         fig5ax.plot(range(len(g_e)), g_e, label='p='+str(p))
         fig, ax = p_to_fig[p]
