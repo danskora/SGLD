@@ -10,6 +10,7 @@ from sgld_optimizer import NewSGLD
 from torch.utils.data import Subset
 import os
 import math
+import numpy as np
 
 
 class NoisyMNIST(torchvision.datasets.MNIST):
@@ -95,29 +96,27 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
             loss.backward()
             optimizer.step()
             scheduler.step()
-            predictions = torch.argmax(outputs, dim=1)
-            for j in range(len(predictions)):
-                if predictions[j] == labels[j]:
-                    correct += 1
+            correct += total_correct(model(inputs), labels)
         train_acc.append(correct / len(train_loader.dataset))
 
         # test
         model.eval()
         correct = 0
-        with torch.no_grad():
+        with torch.no_grad():  # do i need no_grad if not calling loss.backward()?  what about calling criterion()?
             for _inputs, _labels in test_loader:
                 inputs = _inputs.to(device)
                 labels = _labels.to(device)
-                predictions = torch.argmax(model(inputs), dim=1)
-                for j in range(len(predictions)):
-                    if predictions[j] == labels[j]:
-                        correct += 1
+                correct += total_correct(model(inputs), labels)  # is it worth converting to "device" just to pass through model?
         test_acc.append(correct / len(test_loader.dataset))
 
         if epoch % 100 == 99:
             print("Completed " + str(epoch+1) + " epochs.")
 
     return train_acc, test_acc, g_e
+
+
+def total_correct(outputs, targets):
+    return np.sum(outputs.cpu().numpy().argmax(axis=1) == targets.data.cpu().numpy())
 
 
 def make_alexnet(n_channels):
