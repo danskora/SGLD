@@ -116,7 +116,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
 
 
 def total_correct(outputs, targets):
-    return np.sum(outputs.cpu().numpy().argmax(axis=1) == targets.data.cpu().numpy())
+    return np.sum(outputs.cpu().detach().numpy().argmax(axis=1) == targets.data.cpu().detach().numpy())
 
 
 def make_alexnet(n_channels):
