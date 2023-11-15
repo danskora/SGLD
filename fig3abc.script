@@ -9,7 +9,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=1
-#SBATCH --mem=32G
+#SBATCH --cpus-per-gpu=8
+#SBATCH --mem=128G
 #SBATCH --time=48:00:00
 #SBATCH -A r00189
 
