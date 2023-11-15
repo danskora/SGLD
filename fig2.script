@@ -14,4 +14,4 @@
 #SBATCH --time=24:00:00
 #SBATCH -A r00189
 
-python mnist_experiment.py --experiment_name fig2 --dataset_size 60000 --batch_size 60000  --var_coef 0.2 --dataset MNIST --model MLP --exper 2 --lr 0 --epochs 500 --noise 0.0
+python mnist_experiment.py --experiment_name fig2 --dataset_size 60000 --batch_size 60000  --std_coef 0.2 --dataset MNIST --model MLP --exper 2 --lr 0 --epochs 500 --noise 0.0
