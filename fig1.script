@@ -10,8 +10,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-gpu=8
-#SBATCH --mem=128G
-#SBATCH --time=96:00:00
+#SBATCH --mem=256G
+#SBATCH --time=48:00:00
 #SBATCH -A r00189
 
-python mnist_experiment.py --experiment_name fig1 --dataset_size 10000 --batch_size 10000  --var_coef 0.08 --dataset MNIST --model MLP --exper 1 --lr 0 --epochs 100000 --noise 0.0 --noise 0.25 --noise 0.50 --noise 0.75
+python mnist_experiment.py --experiment_name fig1 --dataset_size 10000 --batch_size 10000  --std_coef 0.2828427 --dataset MNIST --model MLP --exper 1 --lr 0 --epochs 100000 --noise 0.0 --noise 0.25 --noise 0.50 --noise 0.75
