@@ -180,8 +180,8 @@ if __name__ == '__main__':
                         help='subset of dataset used')
     parser.add_argument('--noise', type=float, action='append',
                         help='amount of noise to add to labels')
-    parser.add_argument('--exper', type=int, default=0,
-                        help='the experiment number we are replicating')
+    parser.add_argument('--exper', type=int, default=None,
+                        help='the experiment number we are replicating (for learning rate scheduling)')
 
     # experiment name
     parser.add_argument('--experiment_name', type=str, default='default',
@@ -235,12 +235,14 @@ if __name__ == '__main__':
     fig3ax.set_ylabel('Generalization Error')
     fig3.suptitle('Generalization Error\n'+r'$\mathcal{L}(\hat{w}, \mathcal{D}) - \mathcal{L}(\hat{w}, S)$')
 
-    # initialize figure 4 (gen error bound)
-    fig4 = plt.figure()
-    fig4ax = fig4.add_subplot()
-    fig4ax.set_xlabel('Step')
-    fig4ax.set_ylabel('Empirical Bound')
-    fig4.suptitle('Bound on Expected Generalization Error')
+    if std_coef != 0:
+
+        # initialize figure 4 (gen error bound)
+        fig4 = plt.figure()
+        fig4ax = fig4.add_subplot()
+        fig4ax.set_xlabel('Step')
+        fig4ax.set_ylabel('Empirical Bound')
+        fig4.suptitle('Bound on Expected Generalization Error')
 
     # initialize figure 5 (g_e)
     fig5 = plt.figure()
@@ -277,11 +279,20 @@ if __name__ == '__main__':
             model = make_alexnet(channels).to(device)
         else:
             raise NotImplementedError
-        optimizer = NewSGLD(model.parameters(), lr=lr, std_coef=std_coef, device=device)
-        if exper == 2:
-            scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
+
+        if std_coef != 0:
+            optimizer = NewSGLD(model.parameters(), lr=lr, std_coef=std_coef, device=device)
         else:
-            scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
+            optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+
+        if exper:  # if we specified an experiment the corresponding scheduler will override the lr argument
+            if exper == 2:
+                scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
+            else:
+                scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
+        else:  # otherwise create a dummy scheduler
+            scheduler = DecayScheduler(optimizer, lr, 1, 100, floor=None)
+
         criterion = nn.CrossEntropyLoss()
 
         # train
@@ -296,28 +307,32 @@ if __name__ == '__main__':
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
         fig2ax.plot(range(epochs), test_acc, label='p='+str(p))
         fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
-        if exper == 3:
-            coef = 8.12 / dataset_size / std_coef
-        else:
-            coef = 2 * math.sqrt(2) / dataset_size / std_coef
-        fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
+        if std_coef != 0:
+            if dataset_size == batch_size:
+                coef = 8.12 / dataset_size / std_coef
+            else:
+                coef = 2 * math.sqrt(2) / dataset_size / std_coef
+            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
         fig5ax.plot(range(len(g_e)), g_e, label='p='+str(p))
         fig, ax = p_to_fig[p]
         batches = (dataset_size - 1) // batch_size + 1
         ax.plot(range(batches-1, epochs*batches, batches), train_acc, label='train accuracy')
         ax.plot(range(batches-1, epochs*batches, batches), [abs(a-b) for a, b in zip(train_acc, test_acc)], label=r'|$err_{gen}(S)$|')
-        ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label=r'$err_{gen}$ bound')
+        if std_coef != 0:
+            ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label=r'$err_{gen}$ bound')
         ax.legend()
         fig.savefig('experiments/' + experiment_name + '/noise' + str(p) + '.png')
 
     fig1ax.legend()
     fig2ax.legend()
     fig3ax.legend()
-    fig4ax.legend()
+    if std_coef != 0:
+        fig4ax.legend()
     fig5ax.legend()
     fig1.savefig('experiments/'+experiment_name+'/train_accuracy.png')
     fig2.savefig('experiments/'+experiment_name+'/test_accuracy.png')
     fig3.savefig('experiments/'+experiment_name+'/gen_error.png')
-    fig4.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
+    if std_coef != 0:
+        fig4.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
     fig5.savefig('experiments/'+experiment_name+'/average_squared_gradient_norm.png')
 
