@@ -225,7 +225,7 @@ if __name__ == '__main__':
         if exper:
             file.write("Learning Rate Decay Format:  experiment " + str(exper) + "\n")
         else:
-            file.write("Initial Learning Rate:  " + str(lr) + "\n")
+            file.write("Learning Rate:  " + str(lr) + "\n")
         file.write("sigma/gamma:  " + str(std_coef) + "\n")
 
     # initialize figure 1 (train acc)
