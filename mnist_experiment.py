@@ -220,7 +220,8 @@ if __name__ == '__main__':
         file.write("Dataset:  " + dataset + "\n\n")
 
         file.write("Dataset Size:  " + str(dataset_size) + "\n")
-        file.write("Minibatch Size:  " + str(batch_size) + "\n\n")
+        file.write("Minibatch Size:  " + str(batch_size) + "\n")
+        file.write("Epochs:  " + str(epochs) + "\n\n")
 
         if exper:
             file.write("Learning Rate Decay Format:  experiment " + str(exper) + "\n")
