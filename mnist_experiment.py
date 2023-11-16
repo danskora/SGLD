@@ -214,6 +214,20 @@ if __name__ == '__main__':
     if not os.path.exists('experiments/' + experiment_name):
         os.mkdir('experiments/' + experiment_name)
 
+    # record important parameters
+    with open('experiments/' + experiment_name + '/_experiment_specifications.txt', "w") as file:
+        file.write("Model Architecture:  " + model_cfg + "\n")
+        file.write("Dataset:  " + dataset + "\n\n")
+
+        file.write("Dataset Size:  " + str(dataset_size) + "\n")
+        file.write("Minibatch Size:  " + str(batch_size) + "\n\n")
+
+        if exper:
+            file.write("Learning Rate Decay Format:  experiment " + str(exper) + "\n")
+        else:
+            file.write("Initial Learning Rate:  " + str(lr) + "\n")
+        file.write("sigma/gamma:  " + str(std_coef) + "\n")
+
     # initialize figure 1 (train acc)
     fig1 = plt.figure()
     fig1ax = fig1.add_subplot()
