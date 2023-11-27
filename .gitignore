@@ -5,3 +5,5 @@
 /data/*
 !/data/__init__.py
 !/data/datasets.py
+
+/experiments/
