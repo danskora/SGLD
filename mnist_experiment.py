@@ -81,6 +81,8 @@ if __name__ == '__main__':
     # training parameters
     parser.add_argument('--lr', type=float, default=0.05,
                         help='learning rate')
+    parser.add_argument('--sched', type=int, default=None,
+                        help='the number representing which learning rate scheduler we are using')
     parser.add_argument('--std_coef', type=float, default=0.000001,
                         help='ratio of langevin noise standard deviation to learning rate (sigma/gamma)')
     parser.add_argument('--batch_size', type=int, default=500,
@@ -97,8 +99,6 @@ if __name__ == '__main__':
                         help='subset of dataset used')
     parser.add_argument('--noise', type=float, action='append',
                         help='amount of noise to add to labels')
-    parser.add_argument('--exper', type=int, default=None,
-                        help='the experiment number we are replicating (for learning rate scheduling)')
 
     # experiment name
     parser.add_argument('--experiment_name', type=str, default='default',
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     dataset = args.dataset
     dataset_size = args.dataset_size
     noise = args.noise if args.noise else [0.0, 0.5]
-    exper = args.exper
+    sched = args.sched
     experiment_name = args.experiment_name
 
     validation_size = 0
@@ -139,8 +139,8 @@ if __name__ == '__main__':
         file.write("Minibatch Size:  " + str(batch_size) + "\n")
         file.write("Epochs:  " + str(epochs) + "\n\n")
 
-        if exper:
-            file.write("Learning Rate Decay Format:  experiment " + str(exper) + "\n")
+        if sched:
+            file.write("Learning Rate Decay Format:  " + str(sched) + "\n")
         else:
             file.write("Learning Rate:  " + str(lr) + "\n")
         file.write("sigma/gamma:  " + str(std_coef) + "\n")
@@ -205,9 +205,9 @@ if __name__ == '__main__':
 
         # initialize stuff for our algorithm
         if model_cfg == 'MLP':
-            model = models.make_mlp().to(device)
+            model = models.MLP().to(device)
         elif model_cfg == 'AlexNet':
-            model = models.make_alexnet(channels).to(device)
+            model = models.AlexNet(channels).to(device)
         else:
             raise NotImplementedError
 
@@ -216,11 +216,13 @@ if __name__ == '__main__':
         else:
             optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
-        if exper:  # if we specified an experiment the corresponding scheduler will override the lr argument
-            if exper == 2:
+        if sched:  # if we specified a scheduler it will override the lr argument
+            if sched == 2:
                 scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
-            else:
+            elif sched == 1:
                 scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
+            else:
+                raise NotImplementedError
         else:  # otherwise create a dummy scheduler
             scheduler = DecayScheduler(optimizer, lr, 1, 100, floor=None)
 
