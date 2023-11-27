@@ -1,66 +1,15 @@
 import argparse
 import os
 import math
-import random
 
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import torch.nn as nn
-import torchvision
-from torchvision import transforms
-from torch.utils.data import Subset
 
 from my_helpers import *
 from sgld_optimizer import NewSGLD
-
-
-class NoisyMNIST(torchvision.datasets.MNIST):
-    def __init__(self, noise, size=None, train=True):
-        if not size:
-            size = 60000 if train else 10000
-        super(NoisyMNIST, self).__init__(root='./data', train=train, download=True,
-                                         transform=transforms.ToTensor())
-
-        self.newlabels = {}
-        indices = torch.randperm(size)[:int(noise*size)].tolist()
-        for idx in indices:
-            self.newlabels[idx] = int(random.random()*10)
-
-    def __getitem__(self, idx):
-        img, label = super(NoisyMNIST, self).__getitem__(idx)
-        return img, self.newlabels.get(idx, label)
-
-
-class NoisyCIFAR10(torchvision.datasets.CIFAR10):
-    def __init__(self, noise, size=None, train=True):
-        if not size:
-            size = 50000 if train else 10000
-        super(NoisyCIFAR10, self).__init__(root='./data', train=train, download=True,
-                                           transform=transforms.ToTensor())
-
-        self.newlabels = {}
-        indices = torch.randperm(size)[:int(noise*size)].tolist()
-        for idx in indices:
-            self.newlabels[idx] = int(random.random()*10)
-
-    def __getitem__(self, idx):
-        img, label = super(NoisyCIFAR10, self).__getitem__(idx)
-        return img, self.newlabels.get(idx, label)
-
-
-def get_dataset(dataset, noise=0.0, size=None, train=True):
-    if dataset == 'MNIST':
-        d = NoisyMNIST(noise, size=size, train=train)
-    elif dataset == 'CIFAR10':
-        d = NoisyCIFAR10(noise, size=size, train=train)
-    else:
-        raise NotImplementedError
-
-    if size:
-        return Subset(d, range(size))
-    else:
-        return d
+import data
+import models
 
 
 def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
@@ -121,40 +70,6 @@ def total_correct(outputs, targets):
     return np.sum(outputs.cpu().detach().numpy().argmax(axis=1) == targets.data.cpu().detach().numpy())
 
 
-def make_alexnet(n_channels):
-    act = torch.nn.ReLU
-    return nn.Sequential(
-        nn.Conv2d(n_channels, 64, kernel_size=5),
-        act(),
-        nn.MaxPool2d(kernel_size=3),
-        act(),
-        nn.Conv2d(64, 192, kernel_size=5),
-        act(),
-        nn.MaxPool2d(kernel_size=3),
-        act(),
-        nn.Flatten(),
-        nn.LazyLinear(384),
-        act(),
-        nn.Linear(384, 192),
-        act(),
-        nn.Linear(192, 10)
-    )
-
-
-def make_mlp():
-    act = torch.nn.ReLU
-    return nn.Sequential(
-        nn.Flatten(),
-        nn.LazyLinear(512),
-        act(),
-        nn.Linear(512, 512),
-        act(),
-        nn.Linear(512, 512),
-        act(),
-        nn.Linear(512, 10)
-    )
-
-
 if __name__ == '__main__':
 
     # initialize device
@@ -203,12 +118,11 @@ if __name__ == '__main__':
     exper = args.exper
     experiment_name = args.experiment_name
 
-    seed = 1
-    torch.manual_seed(seed)
-    random.seed(seed)
-
     validation_size = 0
     num_workers = 1
+
+    # set seed
+    torch.manual_seed(1)
 
     # make necessary subdirectories
     if not os.path.exists('experiments'):
@@ -284,16 +198,16 @@ if __name__ == '__main__':
         print("Running for p = "+str(p))
 
         # configure datasets and dataloaders
-        trainset = get_dataset(dataset, noise=p, size=dataset_size, train=True)
-        testset = get_dataset(dataset, noise=p, train=False)
+        trainset = data.get_dataset(dataset, noise=p, size=dataset_size, train=True)
+        testset = data.get_dataset(dataset, noise=p, train=False)
         train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
         test_loader = torch.utils.data.DataLoader(testset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
         if model_cfg == 'MLP':
-            model = make_mlp().to(device)
+            model = models.make_mlp().to(device)
         elif model_cfg == 'AlexNet':
-            model = make_alexnet(channels).to(device)
+            model = models.make_alexnet(channels).to(device)
         else:
             raise NotImplementedError
 
@@ -310,7 +224,7 @@ if __name__ == '__main__':
         else:  # otherwise create a dummy scheduler
             scheduler = DecayScheduler(optimizer, lr, 1, 100, floor=None)
 
-        criterion = nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss()
 
         # train
         train_acc, test_acc, g_e = train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs)

@@ -1,7 +1,7 @@
-__pycache__/
-venv/
-.idea/
+/__pycache__/
+/venv/
+/.idea/
 
-data/
-!data/__init__.py
-!data/datasets.py
+/data/*
+!/data/__init__.py
+!/data/datasets.py
