@@ -41,12 +41,13 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
 
 
 def get_dataset(dataset, noise=0.0, size=None, train=True):
-    if dataset == 'MNIST':
-        d = NoisyMNIST(noise, size=size, train=train)
-    elif dataset == 'CIFAR10':
-        d = NoisyCIFAR10(noise, size=size, train=train)
-    else:
-        raise NotImplementedError
+    match dataset:
+        case 'MNIST':
+            d = NoisyMNIST(noise, size=size, train=train)
+        case 'CIFAR10':
+            d = NoisyCIFAR10(noise, size=size, train=train)
+        case _:
+            raise NotImplementedError
 
     if size:
         return Subset(d, range(size))

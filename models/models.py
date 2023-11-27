@@ -24,7 +24,7 @@ def AlexNet(n_channels):  # from li paper
     )
 
 
-def MLP():  # from li paper
+def MLP(n_channels):  # from li paper
     act = nn.ReLU
     return nn.Sequential(
         nn.Flatten(),

@@ -1,6 +1,7 @@
 import argparse
 import os
 import math
+import random
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,6 +25,28 @@ def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this s
         for p in model.parameters():
             total += torch.sum(p.grad ** 2).item()
     return total/200
+
+
+# def new_calc_g_e(model, optimizer, criterion, train, test):
+#     i1 = random.randint(0, len(train)-1)
+#     i2 = random.randint(0, len(test)-1)
+#     d1 = train[i1]
+#     d2 = test[i2]
+#     d1.unsqueeze_(0)
+#     d2.unsqueeze_(0)
+#
+#
+#
+#     # finish this, then run tests on his experiments
+#     for idx in indices:
+#         datapoint, label = dataset[idx]
+#         datapoint.unsqueeze_(0)
+#         optimizer.zero_grad()
+#         loss = criterion(model(datapoint.to(device)), torch.tensor([label], device=device))
+#         loss.backward()
+#         for p in model.parameters():
+#             total += torch.sum(p.grad ** 2).item()
+#     return total/200
 
 
 def train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs):
@@ -83,19 +106,19 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument('--sched', type=int, default=None,
                         help='the number representing which learning rate scheduler we are using')
-    parser.add_argument('--std_coef', type=float, default=0.000001,
+    parser.add_argument('--std_coef', type=float, default=0.1,
                         help='ratio of langevin noise standard deviation to learning rate (sigma/gamma)')
-    parser.add_argument('--batch_size', type=int, default=500,
+    parser.add_argument('--batch_size', type=int, default=200,
                         help='minibatch size for training and testing')
-    parser.add_argument('--epochs', type=int, default=150,
+    parser.add_argument('--epochs', type=int, default=1000,
                         help='number of epochs for training')
 
     # experiment conditions
-    parser.add_argument('--model', type=str, default='AlexNet',
+    parser.add_argument('--model', type=str, default='CNN3',
                         help='model type')
-    parser.add_argument('--dataset', type=str, default='MNIST',
+    parser.add_argument('--dataset', type=str, default='CIFAR10',
                         help='dataset used')
-    parser.add_argument('--dataset_size', type=int, default=60000,
+    parser.add_argument('--dataset_size', type=int, default=50000,
                         help='subset of dataset used')
     parser.add_argument('--noise', type=float, action='append',
                         help='amount of noise to add to labels')
@@ -205,9 +228,13 @@ if __name__ == '__main__':
 
         # initialize stuff for our algorithm
         if model_cfg == 'MLP':
-            model = models.MLP().to(device)
+            model = models.MLP(channels).to(device)
         elif model_cfg == 'AlexNet':
             model = models.AlexNet(channels).to(device)
+        if model_cfg == 'CNN2':
+            model = models.CNN2(channels).to(device)
+        elif model_cfg == 'CNN3':
+            model = models.CNN3(channels).to(device)
         else:
             raise NotImplementedError
 
@@ -221,6 +248,8 @@ if __name__ == '__main__':
                 scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
             elif sched == 1:
                 scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
+            elif sched == 3:
+                scheduler = DecayScheduler(optimizer, 0.005, 0.995, 5*dataset_size/batch_size, floor=0.0005)
             else:
                 raise NotImplementedError
         else:  # otherwise create a dummy scheduler
