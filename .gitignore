@@ -2,11 +2,6 @@ __pycache__/
 venv/
 .idea/
 
-checkpoints/
-results/
-
-
-classification_data/
-classification_data.tar.gz
-cifar-10-batches-py/
-cifar-10-python.tar.gz
+data/
+!data/__init__.py
+!data/datasets.py
