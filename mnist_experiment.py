@@ -1,16 +1,18 @@
 import argparse
-import torch
-from my_helpers import *
+import os
+import math
 import random
+
+import numpy as np
 import matplotlib.pyplot as plt
+import torch
 import torch.nn as nn
 import torchvision
 from torchvision import transforms
-from sgld_optimizer import NewSGLD
 from torch.utils.data import Subset
-import os
-import math
-import numpy as np
+
+from my_helpers import *
+from sgld_optimizer import NewSGLD
 
 
 class NoisyMNIST(torchvision.datasets.MNIST):
