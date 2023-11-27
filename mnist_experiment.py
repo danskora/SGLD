@@ -231,7 +231,7 @@ if __name__ == '__main__':
             model = models.MLP(channels).to(device)
         elif model_cfg == 'AlexNet':
             model = models.AlexNet(channels).to(device)
-        if model_cfg == 'CNN2':
+        elif model_cfg == 'CNN2':
             model = models.CNN2(channels).to(device)
         elif model_cfg == 'CNN3':
             model = models.CNN3(channels).to(device)
@@ -249,7 +249,7 @@ if __name__ == '__main__':
             elif sched == 1:
                 scheduler = DecayScheduler(optimizer, 0.003, 0.995, 60, floor=0.0005)
             elif sched == 3:
-                scheduler = DecayScheduler(optimizer, 0.005, 0.995, 5*dataset_size/batch_size, floor=0.0005)
+                scheduler = DecayScheduler(optimizer, 0.005, 0.995, 5*dataset_size/batch_size, floor=None)
             else:
                 raise NotImplementedError
         else:  # otherwise create a dummy scheduler
