@@ -1,52 +1,23 @@
 import argparse
 import os
 import math
-import random
 
-import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-from my_helpers import *
+from decay_scheduler import *
 from sgld_optimizer import NewSGLD
+from bounds import *
+from helpers import total_correct
 import data
 import models
 
-
-def calc_g_e(model, optimizer, criterion, dataset):  # doesn't matter but this should run in eval mode i think
-    indices = torch.randperm(len(dataset))[:200].tolist()
-    total = 0
-    for idx in indices:
-        datapoint, label = dataset[idx]
-        datapoint.unsqueeze_(0)
-        optimizer.zero_grad()
-        loss = criterion(model(datapoint.to(device)), torch.tensor([label], device=device))
-        loss.backward()
-        for p in model.parameters():
-            total += torch.sum(p.grad ** 2).item()
-    return total/200
-
-
-# def new_calc_g_e(model, optimizer, criterion, train, test):
-#     i1 = random.randint(0, len(train)-1)
-#     i2 = random.randint(0, len(test)-1)
-#     d1 = train[i1]
-#     d2 = test[i2]
-#     d1.unsqueeze_(0)
-#     d2.unsqueeze_(0)
-#
-#
-#
-#     # finish this, then run tests on his experiments
-#     for idx in indices:
-#         datapoint, label = dataset[idx]
-#         datapoint.unsqueeze_(0)
-#         optimizer.zero_grad()
-#         loss = criterion(model(datapoint.to(device)), torch.tensor([label], device=device))
-#         loss.backward()
-#         for p in model.parameters():
-#             total += torch.sum(p.grad ** 2).item()
-#     return total/200
+# replace epochs with steps entirely (excpet for args/params), and maybe only save data every 10 steps or so...
+# run this several times to get a better bound
+# parameters for # trials for each expectation
+# parameters for schedulers?
+# check what yadi said about Jensen ineq and resampling z z'
+# have separate file for creating plots, and also include log scale for everything
 
 
 def train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs):
@@ -54,6 +25,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
     train_acc = []
     test_acc = []
     g_e = []
+    new_g_e = []
 
     for epoch in range(epochs):
 
@@ -63,7 +35,8 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
         for i, (_inputs, _labels) in enumerate(train_loader):
             inputs = _inputs.to(device)
             labels = _labels.to(device)
-            g_e.append(calc_g_e(model, optimizer, criterion, train_loader.dataset))
+            g_e.append(calc_li_summand(model, optimizer, criterion, train_loader.dataset)[1])
+            new_g_e.append(calc_banerjee_summand(model, optimizer, criterion, train_loader.dataset, test_loader.dataset)[1])
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -86,11 +59,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
         if epoch % 100 == 99:
             print("Completed " + str(epoch+1) + " epochs.")
 
-    return train_acc, test_acc, g_e
-
-
-def total_correct(outputs, targets):
-    return np.sum(outputs.cpu().detach().numpy().argmax(axis=1) == targets.data.cpu().detach().numpy())
+    return train_acc, test_acc, g_e, new_g_e
 
 
 if __name__ == '__main__':
@@ -150,8 +119,9 @@ if __name__ == '__main__':
     # make necessary subdirectories
     if not os.path.exists('experiments'):
         os.mkdir('experiments')
-    if not os.path.exists('experiments/' + experiment_name):
-        os.mkdir('experiments/' + experiment_name)
+    path = 'experiments/' + experiment_name
+    if not os.path.exists(path):
+        os.mkdir(path)
 
     # record important parameters
     with open('experiments/' + experiment_name + '/_experiment_specifications.txt', "w") as file:
@@ -227,7 +197,7 @@ if __name__ == '__main__':
         test_loader = torch.utils.data.DataLoader(testset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
-        if model_cfg == 'MLP':
+        if model_cfg == 'MLP':  # put this all in one thing with yadi's getattr approach
             model = models.MLP(channels).to(device)
         elif model_cfg == 'AlexNet':
             model = models.AlexNet(channels).to(device)
@@ -238,12 +208,9 @@ if __name__ == '__main__':
         else:
             raise NotImplementedError
 
-        if std_coef != 0:
-            optimizer = NewSGLD(model.parameters(), lr=lr, std_coef=std_coef, device=device)
-        else:
-            optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+        optimizer = NewSGLD(model.parameters(), lr=lr, std_coef=std_coef, device=device)
 
-        if sched:  # if we specified a scheduler it will override the lr argument
+        if sched:  # if we specified a scheduler it will override the lr argument, this is messy !!
             if sched == 2:
                 scheduler = DecayScheduler(optimizer, 0.01, 0.95, 60, floor=None)
             elif sched == 1:
@@ -258,12 +225,17 @@ if __name__ == '__main__':
         criterion = torch.nn.CrossEntropyLoss()
 
         # train
-        train_acc, test_acc, g_e = train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs)
+        train_acc, test_acc, g_e, new_g_e = train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs)
 
         sum_term = [0]
         for e in g_e:
             sum_term.append(sum_term[-1] + e)
         sum_term.pop(0)
+
+        new_sum_term = [0]
+        for e in new_g_e:
+            new_sum_term.append(new_sum_term[-1] + e)
+        new_sum_term.pop(0)
 
         # plot
         fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
@@ -274,14 +246,16 @@ if __name__ == '__main__':
                 coef = 8.12 / dataset_size / std_coef
             else:
                 coef = 2 * math.sqrt(2) / dataset_size / std_coef
-            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='p='+str(p))
+            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='li')
+            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size / std_coef for i in new_sum_term], label='banerjee')
         fig5ax.plot(range(len(g_e)), g_e, label='p='+str(p))
         fig, ax = p_to_fig[p]
         batches = (dataset_size - 1) // batch_size + 1
         ax.plot(range(batches-1, epochs*batches, batches), train_acc, label='train accuracy')
         ax.plot(range(batches-1, epochs*batches, batches), [abs(a-b) for a, b in zip(train_acc, test_acc)], label=r'|$err_{gen}(S)$|')
         if std_coef != 0:
-            ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label=r'$err_{gen}$ bound')
+            ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label=r'li $err_{gen}$ bound')
+            ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size / std_coef for i in new_sum_term], label=r'banerjee $err_{gen}$ bound')
         ax.legend()
         fig.savefig('experiments/' + experiment_name + '/noise' + str(p) + '.png')
 
