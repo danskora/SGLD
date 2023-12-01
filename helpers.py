@@ -60,9 +60,9 @@ def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, ban
 
     epochs = len(train_acc)
     if li_summand:
-        batches = len(li_summand) / epochs
+        batches = len(li_summand) // epochs
     elif banerjee_summand:
-        batches = len(banerjee_summand) / epochs
+        batches = len(banerjee_summand) // epochs
     else:
         batches = 1
 
