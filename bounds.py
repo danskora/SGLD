@@ -73,7 +73,7 @@ def calc_banerjee_bound(summand_ls, n, stochastic=True):
     summation_ls = [0]
     for e in summand_ls:
         summation_ls.append(summation_ls[-1] + e)
-        summation_ls.pop(0)
+    summation_ls.pop(0)
 
     if not stochastic:
         raise Exception('Banerjee bound requires stochastic gradient!')
