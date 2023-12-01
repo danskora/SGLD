@@ -71,10 +71,10 @@ def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, ban
     ax.plot(range(batches, (epochs+1) * batches, batches), [a-b for a, b in zip(train_acc, test_acc)],
             label=r'$err_{gen}(S)$')
     if li_summand:
-        ax.plot(range(len(li_summand)), calc_li_bound(li_summand, dataset_size, batches == 1),
+        ax.plot(range(len(li_summand)), calc_li_bound(li_summand, dataset_size, batches != 1),
                 label=r'li $err_{gen}$ bound')
     if banerjee_summand:
-        ax.plot(range(len(banerjee_summand)), calc_banerjee_bound(banerjee_summand, dataset_size, batches == 1),
+        ax.plot(range(len(banerjee_summand)), calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1),
                 label=r'banerjee $err_{gen}$ bound')
 
     ax.legend()

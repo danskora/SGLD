@@ -222,7 +222,7 @@ if __name__ == '__main__':
                 coef = 2 * math.sqrt(2) / dataset_size
             fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='li')
             fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size for i in new_sum_term], label='banerjee')
-        fig5ax.plot(range(len(g_e)), g_e * (std_coef ** 2), label='p='+str(p))
+        fig5ax.plot(range(len(g_e)), [i * (std_coef ** 2) for i in g_e], label='p='+str(p))
 
         plot_bounds(path, p, dataset_size, train_acc, test_acc, g_e, new_g_e)
 
