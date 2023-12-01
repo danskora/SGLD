@@ -49,7 +49,7 @@ class NewSGLD(Optimizer):
                 if self.std_coef != 0:
                     size = gradient.size()
                     noise = Normal(torch.zeros(size, device=self.device),
-                                   torch.ones(size, device=self.device) * group['lr'] * self.std_coef / math.sqrt(2))
+                                   torch.ones(size, device=self.device) * group['lr'] * self.std_coef / math.sqrt(2))  # this root2 doesn't appear in banerjee
                     p.data.add_(noise.sample())
 
         return loss  # what even is this

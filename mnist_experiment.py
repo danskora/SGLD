@@ -4,11 +4,12 @@ import math
 
 import matplotlib.pyplot as plt
 import torch
+from torch.utils.data import DataLoader
 
 from decay_scheduler import *
 from sgld_optimizer import NewSGLD
 from bounds import *
-from helpers import total_correct
+from helpers import *
 import data
 import models
 
@@ -17,7 +18,9 @@ import models
 # parameters for # trials for each expectation
 # parameters for schedulers?
 # check what yadi said about Jensen ineq and resampling z z'
-# have separate file for creating plots, and also include log scale for everything
+# have separate file for creating plots, and also INCLUDE LOG SCALE for everything
+
+# g_e and new_g_e are really poorly named in this file
 
 
 def train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs):
@@ -138,27 +141,6 @@ if __name__ == '__main__':
             file.write("Learning Rate:  " + str(lr) + "\n")
         file.write("sigma/gamma:  " + str(std_coef) + "\n")
 
-    # initialize figure 1 (train acc)
-    fig1 = plt.figure()
-    fig1ax = fig1.add_subplot()
-    fig1ax.set_xlabel('Epoch')
-    fig1ax.set_ylabel('Accuracy')
-    fig1.suptitle('Train Accuracy')
-
-    # initialize figure 2 (test acc)
-    fig2 = plt.figure()
-    fig2ax = fig2.add_subplot()
-    fig2ax.set_xlabel('Epoch')
-    fig2ax.set_ylabel('Accuracy')
-    fig2.suptitle('Test Accuracy')
-
-    # initialize figure 3 (gen error)
-    fig3 = plt.figure()
-    fig3ax = fig3.add_subplot()
-    fig3ax.set_xlabel('Epoch')
-    fig3ax.set_ylabel('Generalization Error')
-    fig3.suptitle('Generalization Error\n'+r'$\mathcal{L}(\hat{w}, \mathcal{D}) - \mathcal{L}(\hat{w}, S)$')
-
     if std_coef != 0:
 
         # initialize figure 4 (gen error bound)
@@ -174,18 +156,11 @@ if __name__ == '__main__':
     fig5ax.set_xlabel('Step')
     fig5.suptitle('Average Squared Gradient Norm')
 
-    # initialize figures corresponding to each noise value
-    p_to_fig = {}
-    for p in noise:
-        fig = plt.figure()
-        ax = fig.add_subplot()
-        ax.set_xlabel('Step')
-        fig.suptitle('noise = ' + str(p))
-        p_to_fig[p] = (fig, ax)
-
     # eventually we should remove discrepancy between "steps" and "epochs" and bound test accuracy/loss directly
 
     channels = 1 if dataset == 'MNIST' else 3
+
+    acc_dict = {}
 
     for p in noise:
         print("Running for p = "+str(p))
@@ -193,8 +168,8 @@ if __name__ == '__main__':
         # configure datasets and dataloaders
         trainset = data.get_dataset(dataset, noise=p, size=dataset_size, train=True)
         testset = data.get_dataset(dataset, noise=p, train=False)
-        train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
-        test_loader = torch.utils.data.DataLoader(testset, batch_size=1000, num_workers=num_workers)
+        train_loader = DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
+        test_loader = DataLoader(testset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
         if model_cfg == 'MLP':  # put this all in one thing with yadi's getattr approach
@@ -225,7 +200,8 @@ if __name__ == '__main__':
         criterion = torch.nn.CrossEntropyLoss()
 
         # train
-        train_acc, test_acc, g_e, new_g_e = train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs)
+        train_acc, test_acc, g_e, new_g_e = train_model(model, optimizer, scheduler, criterion,
+                                                        train_loader, test_loader, epochs)
 
         sum_term = [0]
         for e in g_e:
@@ -238,36 +214,22 @@ if __name__ == '__main__':
         new_sum_term.pop(0)
 
         # plot
-        fig1ax.plot(range(epochs), train_acc, label='p='+str(p))
-        fig2ax.plot(range(epochs), test_acc, label='p='+str(p))
-        fig3ax.plot(range(epochs), [a-b for a, b in zip(train_acc, test_acc)], label='p='+str(p))
+        acc_dict[p] = train_acc, test_acc
         if std_coef != 0:
             if dataset_size == batch_size:
-                coef = 8.12 / dataset_size / std_coef
+                coef = 8.12 / dataset_size
             else:
-                coef = 2 * math.sqrt(2) / dataset_size / std_coef
+                coef = 2 * math.sqrt(2) / dataset_size
             fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='li')
-            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size / std_coef for i in new_sum_term], label='banerjee')
-        fig5ax.plot(range(len(g_e)), g_e, label='p='+str(p))
-        fig, ax = p_to_fig[p]
-        batches = (dataset_size - 1) // batch_size + 1
-        ax.plot(range(batches-1, epochs*batches, batches), train_acc, label='train accuracy')
-        ax.plot(range(batches-1, epochs*batches, batches), [abs(a-b) for a, b in zip(train_acc, test_acc)], label=r'|$err_{gen}(S)$|')
-        if std_coef != 0:
-            ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label=r'li $err_{gen}$ bound')
-            ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size / std_coef for i in new_sum_term], label=r'banerjee $err_{gen}$ bound')
-        ax.legend()
-        fig.savefig('experiments/' + experiment_name + '/noise' + str(p) + '.png')
+            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size for i in new_sum_term], label='banerjee')
+        fig5ax.plot(range(len(g_e)), g_e * (std_coef ** 2), label='p='+str(p))
 
-    fig1ax.legend()
-    fig2ax.legend()
-    fig3ax.legend()
+        plot_bounds(path, p, dataset_size, train_acc, test_acc, g_e, new_g_e)
+
+    plot_acc(path, acc_dict)
     if std_coef != 0:
         fig4ax.legend()
     fig5ax.legend()
-    fig1.savefig('experiments/'+experiment_name+'/train_accuracy.png')
-    fig2.savefig('experiments/'+experiment_name+'/test_accuracy.png')
-    fig3.savefig('experiments/'+experiment_name+'/gen_error.png')
     if std_coef != 0:
         fig4.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
     fig5.savefig('experiments/'+experiment_name+'/average_squared_gradient_norm.png')
