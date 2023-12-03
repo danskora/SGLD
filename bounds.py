@@ -86,7 +86,7 @@ def calc_banerjee_bound(summand_tensor, n, stochastic=True):
     fig.suptitle('Banerjee Bonus')
     for i in range(100):
         ax.plot(range(len(summation_tensor)), summation_tensor[:, i])
-    fig.savefig('/BONUS.png')
+    fig.savefig('experiments/BONUS.png')
 
     ###### this will run several times and plot into the same file, so we will always see the last value of p
 
