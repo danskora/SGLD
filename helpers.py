@@ -149,8 +149,8 @@ def plot_grad(path, grad_dict):
 
         fig1ax.plot(x, sq_grad_norm, label=l)
         fig2ax.plot(x, grad_disc, label=l)
-        fig3ax.plot(x, sq_grad_norm, label='li, '+l)
-        fig3ax.plot(x, grad_disc, label='banerjee, '+l)
+        fig3ax.plot(x, sq_grad_norm, label='squared gradient norm, '+l)
+        fig3ax.plot(x, grad_disc, label='gradient discrepancy, '+l)
 
     fig1ax.legend()
     fig2ax.legend()
