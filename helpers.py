@@ -110,8 +110,8 @@ def plot_bounds(path, bound_dict):
         l = 'p=' + str(p)
 
         fig1ax.plot(x, li_bound, label=l)
-        fig2ax.plot(x, banerjee_bound, label='li, '+l)
-        fig3ax.plot(x, li_bound, label=l)
+        fig2ax.plot(x, banerjee_bound, label=l)
+        fig3ax.plot(x, li_bound, label='li, '+l)
         fig3ax.plot(x, banerjee_bound, label='banerjee, '+l)
 
     fig1ax.legend()
@@ -148,8 +148,8 @@ def plot_grad(path, grad_dict):
         l = 'p=' + str(p)
 
         fig1ax.plot(x, sq_grad_norm, label=l)
-        fig2ax.plot(x, grad_disc, label='li, '+l)
-        fig3ax.plot(x, sq_grad_norm, label=l)
+        fig2ax.plot(x, grad_disc, label=l)
+        fig3ax.plot(x, sq_grad_norm, label='li, '+l)
         fig3ax.plot(x, grad_disc, label='banerjee, '+l)
 
     fig1ax.legend()
