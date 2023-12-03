@@ -30,16 +30,18 @@ def train_model(model, optimizer, scheduler, criterion, trainset, testset, epoch
 
     train_acc = []
     test_acc = []
-    g_e = []
-    new_g_e = []
+    squared_gradient_norm = []
+    li_summand = []
+    gradient_discrepancy = []
+    banerjee_summand = []
 
     z_ls = []       # this depends on dataset having 10 label types, so it won't work on CIFAR100 but whatever
     z_prime_ls = []
     for i in range(10):
         indices = [j for j in range(len(trainset)) if trainset[j][1] == i]
-        z_ls.append(train_loader.dataset[indices[0]])
+        z_ls.append(trainset[indices[0]])
         indices = [j for j in range(len(testset)) if testset[j][1] == i]
-        z_prime_ls.append(test_loader.dataset[indices[0]])
+        z_prime_ls.append(testset[indices[0]])
 
     for epoch in range(epochs):
 
@@ -49,8 +51,8 @@ def train_model(model, optimizer, scheduler, criterion, trainset, testset, epoch
         for i, (_inputs, _labels) in enumerate(train_loader):
             inputs = _inputs.to(device)
             labels = _labels.to(device)
-            g_e.append(calc_li_summand(model, optimizer, criterion, train_loader.dataset)[1])
-            new_g_e.append(calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls)[1])
+            li_summand.append(calc_li_summand(model, optimizer, criterion, train_loader.dataset)[1])
+            banerjee_summand.append(calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls)[1])
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -58,7 +60,7 @@ def train_model(model, optimizer, scheduler, criterion, trainset, testset, epoch
             optimizer.step()
             scheduler.step()
             correct += total_correct(model(inputs), labels)
-        train_acc.append(correct / len(train_loader.dataset))
+        train_acc.append(correct / len(trainset))
 
         # test
         model.eval()
@@ -68,12 +70,12 @@ def train_model(model, optimizer, scheduler, criterion, trainset, testset, epoch
                 inputs = _inputs.to(device)
                 labels = _labels.to(device)
                 correct += total_correct(model(inputs), labels)  # is it worth converting to "device" just to pass through model?
-        test_acc.append(correct / len(test_loader.dataset))
+        test_acc.append(correct / len(testset))
 
         if epoch % 100 == 99:
             print("Completed " + str(epoch+1) + " epochs.")
 
-    return train_acc, test_acc, g_e, torch.FloatTensor(new_g_e)
+    return train_acc, test_acc, li_summand, torch.FloatTensor(banerjee_summand)
 
 
 if __name__ == '__main__':
@@ -209,16 +211,16 @@ if __name__ == '__main__':
         criterion = torch.nn.CrossEntropyLoss()
 
         # train
-        train_acc, test_acc, g_e, new_g_e = train_model(model, optimizer, scheduler, criterion,
-                                                        trainset, testset, epochs)
+        train_acc, test_acc, li_summand, banerjee_summand = train_model(model, optimizer, scheduler, criterion,
+                                                                        trainset, testset, epochs)
 
         sum_term = [0]
-        for e in g_e:
+        for e in li_summand:
             sum_term.append(sum_term[-1] + e)
         sum_term.pop(0)
 
         new_sum_term = [0]
-        for e in new_g_e:
+        for e in banerjee_summand:
             new_sum_term.append(new_sum_term[-1] + e)
         new_sum_term.pop(0)
 
@@ -230,11 +232,11 @@ if __name__ == '__main__':
             else:
                 coef = 2 * math.sqrt(2) / dataset_size
             fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='li')
-            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size for i in new_sum_term], label='banerjee')
-        fig5ax.plot(range(len(g_e)), [i * (std_coef ** 2) for i in g_e], label='(squared gradient norm) p='+str(p))
-        fig5ax.plot(range(len(g_e)), [i * (std_coef ** 2) for i in torch.mean(new_g_e, dim=1)], label='(squared gradient discrepancy) p='+str(p))
+            #fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size for i in new_sum_term], label='banerjee')
+        fig5ax.plot(range(len(li_summand)), [i * (std_coef ** 2) for i in li_summand], label='(squared gradient norm) p=' + str(p))
+        fig5ax.plot(range(len(li_summand)), [i * (std_coef ** 2) for i in torch.mean(banerjee_summand, dim=1)], label='(squared gradient discrepancy) p=' + str(p))
 
-        plot_bounds(path, p, dataset_size, train_acc, test_acc, g_e, new_g_e)
+        plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand, banerjee_summand)
 
     plot_acc(path, acc_dict)
     if std_coef != 0:
