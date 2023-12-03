@@ -23,7 +23,10 @@ import models
 # g_e and new_g_e are really poorly named in this file
 
 
-def train_model(model, optimizer, scheduler, criterion, train_loader, test_loader, epochs):
+def train_model(model, optimizer, scheduler, criterion, trainset, testset, epochs):  # make batchsize param
+
+    train_loader = DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
+    test_loader = DataLoader(testset, batch_size=1000, num_workers=num_workers)
 
     train_acc = []
     test_acc = []
@@ -32,12 +35,10 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
 
     z_ls = []       # this depends on dataset having 10 label types, so it won't work on CIFAR100 but whatever
     z_prime_ls = []
-    train_indices = list(train_loader.batch_sampler.sampler.indices)
-    test_indices = list(test_loader.batch_sampler.sampler.indices)
     for i in range(10):
-        indices = [j for j in train_indices if train_loader.dataset.targets[j] == i]
+        indices = [j for j in range(len(trainset)) if trainset[j][1] == i]
         z_ls.append(train_loader.dataset[indices[0]])
-        indices = [j for j in test_indices if test_loader.dataset.targets[j] == i]
+        indices = [j for j in range(len(testset)) if testset[j][1] == i]
         z_prime_ls.append(test_loader.dataset[indices[0]])
 
     for epoch in range(epochs):
@@ -178,8 +179,6 @@ if __name__ == '__main__':
         # configure datasets and dataloaders
         trainset = data.get_dataset(dataset, noise=p, size=dataset_size, train=True)
         testset = data.get_dataset(dataset, noise=p, train=False)
-        train_loader = DataLoader(trainset, batch_size=batch_size, num_workers=num_workers)
-        test_loader = DataLoader(testset, batch_size=1000, num_workers=num_workers)
 
         # initialize stuff for our algorithm
         if model_cfg == 'MLP':  # put this all in one thing with yadi's getattr approach
@@ -211,7 +210,7 @@ if __name__ == '__main__':
 
         # train
         train_acc, test_acc, g_e, new_g_e = train_model(model, optimizer, scheduler, criterion,
-                                                        train_loader, test_loader, epochs)
+                                                        trainset, testset, epochs)
 
         sum_term = [0]
         for e in g_e:
