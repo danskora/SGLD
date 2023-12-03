@@ -1,8 +1,6 @@
 import argparse
 import os
-import math
 
-import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
 
@@ -161,12 +159,6 @@ if __name__ == '__main__':
             file.write("Learning Rate:  " + str(lr) + "\n")
         file.write("sigma/gamma:  " + str(std_coef) + "\n")
 
-    # initialize figure 5 (g_e)
-    fig5 = plt.figure()
-    fig5ax = fig5.add_subplot()
-    fig5ax.set_xlabel('Step')
-    fig5.suptitle('Average Squared Gradient Norm')
-
     # eventually we should remove discrepancy between "steps" and "epochs" and bound test accuracy/loss directly
 
     channels = 1 if dataset == 'MNIST' else 3
@@ -213,28 +205,15 @@ if __name__ == '__main__':
         # train
         train_acc, test_acc, sq_grad_norm, grad_disc, li_summand, banerjee_summand = train_model(model, optimizer, scheduler, criterion, trainset, testset, epochs)
 
-        sum_term = [0]
-        for e in li_summand:
-            sum_term.append(sum_term[-1] + e)
-        sum_term.pop(0)
-
-        new_sum_term = [0]
-        for e in banerjee_summand:
-            new_sum_term.append(new_sum_term[-1] + e)
-        new_sum_term.pop(0)
-
         # plot
         acc_dict[p] = train_acc, test_acc
         bound_dict[p] = (calc_li_bound(li_summand, dataset_size, dataset_size != batch_size),
                          calc_banerjee_bound(banerjee_summand, dataset_size, dataset_size != batch_size))
         grad_dict[p] = sq_grad_norm, grad_disc
 
-        fig5ax.plot(range(len(li_summand)), [i * (std_coef ** 2) for i in li_summand], label='(squared gradient norm) p=' + str(p))
-        fig5ax.plot(range(len(li_summand)), [i * (std_coef ** 2) for i in torch.mean(banerjee_summand, dim=1)], label='(squared gradient discrepancy) p=' + str(p))
-
         plot_everything(path, p, dataset_size, train_acc, test_acc, li_summand, banerjee_summand)
 
     plot_acc(path, acc_dict)
-    fig5ax.legend()
-    fig5.savefig('experiments/'+experiment_name+'/average_squared_gradient_norm.png')
+    plot_bounds(path, bound_dict)
+    plot_grad(path, grad_dict)
 
