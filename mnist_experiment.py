@@ -33,9 +33,9 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
     z_ls = []       # this depends on dataset having 10 label types, so it won't work on CIFAR100 but whatever
     z_prime_ls = []
     for i in range(10):
-        indices = train_loader.dataset.targets == i
+        indices = [j for j in range(len(train_loader.dataset)) if train_loader.dataset.dataset.targets[train_loader.dataset.indices[j]] == i]
         z_ls.append(train_loader.dataset[indices[0]])
-        indices = test_loader.dataset.targets == i
+        indices = [j for j in range(len(test_loader.dataset)) if test_loader.dataset.dataset.targets[test_loader.dataset.indices[j]] == i]
         z_prime_ls.append(test_loader.dataset[indices[0]])
 
     for epoch in range(epochs):
