@@ -18,7 +18,7 @@ import models
 # check what yadi said about Jensen ineq and resampling z z'
 # have separate file for creating plots, and also INCLUDE LOG SCALE for everything
 
-# g_e and new_g_e are really poorly named in this file
+# BUG FOR THESE default parameters (CNN3, CIFAR10)
 
 
 def train_model(model, optimizer, scheduler, criterion, trainset, testset, epochs):  # make batchsize param
