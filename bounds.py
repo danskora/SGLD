@@ -7,8 +7,8 @@ __all__ = ['calc_li_summand', 'calc_banerjee_summand', 'calc_li_bound', 'calc_ba
 
 # random and device, how do I define this globally neatly across all files??
 
-li_gld_constant = math.sqrt(8)
-li_sgld_constant = 8.12
+li_gld_constant = 2
+li_sgld_constant = 8.12 / math.sqrt(2)
 banerjee_sgld_constant = math.sqrt(20)
 
 

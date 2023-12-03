@@ -14,4 +14,4 @@
 #SBATCH --time=48:00:00
 #SBATCH -A r00189
 
-python mnist_experiment.py --experiment_name fig3abc --dataset_size 5000 --batch_size 500  --std_coef 0.002828427 --dataset CIFAR10 --model MLP --sched 1 --lr 0 --epochs 5000
+python mnist_experiment.py --experiment_name fig3abc --dataset_size 5000 --batch_size 500  --std_coef 0.002 --dataset CIFAR10 --model MLP --sched 1 --lr 0 --epochs 5000
