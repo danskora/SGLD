@@ -1,6 +1,6 @@
 import torch
-import random
 import math
+import matplotlib.pyplot as plt
 
 
 __all__ = ['calc_li_summand', 'calc_banerjee_summand', 'calc_li_bound', 'calc_banerjee_bound']
@@ -28,7 +28,8 @@ def calc_li_summand(model, optimizer, criterion, dataset):  # doesn't matter but
         loss.backward()
         for p in model.parameters():
             total += torch.sum(p.grad ** 2).item()
-    return total / 200, total / 200 / (optimizer.std_coef ** 2)
+    avg = total / 200
+    return avg / (optimizer.std_coef ** 2), avg
 
 
 def calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls):
@@ -60,7 +61,7 @@ def calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls):
                 total += torch.sum(x ** 2).item()
             res.append(total)
 
-    return res, [i / (optimizer.std_coef ** 2) for i in res]
+    return [i / (optimizer.std_coef ** 2) for i in res], sum(res)/len(res)
 
 
 def calc_li_bound(summand_ls, n, stochastic=True):
@@ -75,6 +76,20 @@ def calc_li_bound(summand_ls, n, stochastic=True):
 
 def calc_banerjee_bound(summand_tensor, n, stochastic=True):
     summation_tensor = torch.cumsum(summand_tensor, dim=0)
+
+    ###### temporary code to visualize the different bounds for different z and z'
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.set_xlabel('Step')
+    ax.set_ylabel('High Variance Bound')
+    fig.suptitle('Banerjee Bonus')
+    for i in range(100):
+        ax.plot(len(summation_tensor), summation_tensor[:, i])
+    fig.savefig('/BONUS.png')
+
+    ###### this will run several times and plot into the same file, so we will always see the last value of p
+
     expectation_S = torch.mean(torch.sqrt(summation_tensor), dim=1)
 
     if not stochastic:

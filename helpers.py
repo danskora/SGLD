@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 from bounds import *
 
 
-__all__ = ['total_correct', 'plot_acc', 'plot_bounds', 'plot_grad']
+__all__ = ['total_correct', 'plot_acc', 'plot_everything', 'plot_bounds', 'plot_grad']
 
 
 def total_correct(outputs, targets):
     return np.sum(outputs.cpu().detach().numpy().argmax(axis=1) == targets.data.cpu().detach().numpy())
 
 
-def plot_acc(path, acc_dict):  # takes dictionary because each of the three plots will display multiple noise coefficients, works with epochs on x-axis
+def plot_acc(path, acc_dict):
 
     # initialize figure 1 (train acc)
     fig1 = plt.figure()
@@ -51,7 +51,7 @@ def plot_acc(path, acc_dict):  # takes dictionary because each of the three plot
     fig3.savefig(path + '/gen_error.png')
 
 
-def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, banerjee_summand=None):
+def plot_everything(path, p, dataset_size, train_acc, test_acc, li_summand=None, banerjee_summand=None):
 
     fig = plt.figure()
     ax = fig.add_subplot()
@@ -71,10 +71,10 @@ def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, ban
     ax.plot(range(batches, (epochs+1) * batches, batches), [a-b for a, b in zip(train_acc, test_acc)],
             label=r'$err_{gen}(S)$')
     if li_summand is not None:
-        ax.plot(range(len(li_summand)), calc_li_bound(li_summand, dataset_size, batches != 1),
+        ax.plot(range(1, len(li_summand)+1, 1), calc_li_bound(li_summand, dataset_size, batches != 1),
                 label=r'li $err_{gen}$ bound')
     if banerjee_summand is not None:
-        ax.plot(range(len(banerjee_summand)), calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1),
+        ax.plot(range(1, len(banerjee_summand)+1, 1), calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1),
                 label=r'banerjee $err_{gen}$ bound')
 
     ax.legend()
@@ -82,6 +82,81 @@ def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, ban
     fig.savefig(path + '/noise' + str(p) + '.png')
 
 
-def plot_grad(path, squared_grad=None, squared_grad_diff=None):
-    pass
+def plot_bounds(path, bound_dict):
+
+    # initialize figure 1 (li bound)
+    fig1 = plt.figure()
+    fig1ax = fig1.add_subplot()
+    fig1ax.set_xlabel('Step')
+    fig1ax.set_ylabel('Bound')
+    fig1.suptitle('Li Generalization Error Bound')
+
+    # initialize figure 2 (banerjee bound)
+    fig2 = plt.figure()
+    fig2ax = fig2.add_subplot()
+    fig2ax.set_xlabel('Step')
+    fig2ax.set_ylabel('Bound')
+    fig2.suptitle('Banerjee Generalization Error Bound')
+
+    # initialize figure 3 (both bounds)
+    fig3 = plt.figure()
+    fig3ax = fig3.add_subplot()
+    fig3ax.set_xlabel('Step')
+    fig3ax.set_ylabel('Bound')
+    fig3.suptitle('Comparing Generalization Error Bounds')
+
+    for p, (li_bound, banerjee_bound) in bound_dict.items():
+        x = range(1, len(li_bound)+1, 1)
+        l = 'p=' + str(p)
+
+        fig1ax.plot(x, li_bound, label=l)
+        fig2ax.plot(x, banerjee_bound, label='li, '+l)
+        fig3ax.plot(x, li_bound, label=l)
+        fig3ax.plot(x, banerjee_bound, label='banerjee, '+l)
+
+    fig1ax.legend()
+    fig2ax.legend()
+    fig3ax.legend()
+
+    fig1.savefig(path + '/li_bound.png')
+    fig2.savefig(path + '/banerjee_bound.png')
+    fig3.savefig(path + '/both_bounds.png')
+
+
+def plot_grad(path, grad_dict):
+
+    # initialize figure 1 (squared gradient norm)
+    fig1 = plt.figure()
+    fig1ax = fig1.add_subplot()
+    fig1ax.set_xlabel('Step')
+    fig1.suptitle('Squared Gradient Norm')
+
+    # initialize figure 2 (gradient discrepancy)
+    fig2 = plt.figure()
+    fig2ax = fig2.add_subplot()
+    fig2ax.set_xlabel('Step')
+    fig2.suptitle('Gradient Discrepancy')
+
+    # initialize figure 3 (both)
+    fig3 = plt.figure()
+    fig3ax = fig3.add_subplot()
+    fig3ax.set_xlabel('Step')
+    fig3.suptitle('Comparing Gradient Metrics')
+
+    for p, (sq_grad_norm, grad_disc) in grad_dict.items():
+        x = range(1, len(sq_grad_norm)+1, 1)
+        l = 'p=' + str(p)
+
+        fig1ax.plot(x, sq_grad_norm, label=l)
+        fig2ax.plot(x, grad_disc, label='li, '+l)
+        fig3ax.plot(x, sq_grad_norm, label=l)
+        fig3ax.plot(x, grad_disc, label='banerjee, '+l)
+
+    fig1ax.legend()
+    fig2ax.legend()
+    fig3ax.legend()
+
+    fig1.savefig(path + '/squared_gradient_norm.png')
+    fig2.savefig(path + '/gradient_discrepancy.png')
+    fig3.savefig(path + '/both_gradient_metrics.png')
 

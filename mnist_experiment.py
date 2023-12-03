@@ -51,8 +51,15 @@ def train_model(model, optimizer, scheduler, criterion, trainset, testset, epoch
         for i, (_inputs, _labels) in enumerate(train_loader):
             inputs = _inputs.to(device)
             labels = _labels.to(device)
-            li_summand.append(calc_li_summand(model, optimizer, criterion, train_loader.dataset)[1])
-            banerjee_summand.append(calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls)[1])
+
+            a, b = calc_li_summand(model, optimizer, criterion, train_loader.dataset)
+            li_summand.append(a)
+            squared_gradient_norm.append(b)
+
+            a, b = calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls)
+            banerjee_summand.append(a)
+            gradient_discrepancy.append(b)
+
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -75,7 +82,7 @@ def train_model(model, optimizer, scheduler, criterion, trainset, testset, epoch
         if epoch % 100 == 99:
             print("Completed " + str(epoch+1) + " epochs.")
 
-    return train_acc, test_acc, li_summand, torch.FloatTensor(banerjee_summand)
+    return train_acc, test_acc, squared_gradient_norm, gradient_discrepancy, li_summand, torch.FloatTensor(banerjee_summand)
 
 
 if __name__ == '__main__':
@@ -154,15 +161,6 @@ if __name__ == '__main__':
             file.write("Learning Rate:  " + str(lr) + "\n")
         file.write("sigma/gamma:  " + str(std_coef) + "\n")
 
-    if std_coef != 0:
-
-        # initialize figure 4 (gen error bound)
-        fig4 = plt.figure()
-        fig4ax = fig4.add_subplot()
-        fig4ax.set_xlabel('Step')
-        fig4ax.set_ylabel('Empirical Bound')
-        fig4.suptitle('Bound on Expected Generalization Error')
-
     # initialize figure 5 (g_e)
     fig5 = plt.figure()
     fig5ax = fig5.add_subplot()
@@ -174,6 +172,8 @@ if __name__ == '__main__':
     channels = 1 if dataset == 'MNIST' else 3
 
     acc_dict = {}
+    bound_dict = {}
+    grad_dict = {}
 
     for p in noise:
         print("Running for p = "+str(p))
@@ -211,8 +211,7 @@ if __name__ == '__main__':
         criterion = torch.nn.CrossEntropyLoss()
 
         # train
-        train_acc, test_acc, li_summand, banerjee_summand = train_model(model, optimizer, scheduler, criterion,
-                                                                        trainset, testset, epochs)
+        train_acc, test_acc, sq_grad_norm, grad_disc, li_summand, banerjee_summand = train_model(model, optimizer, scheduler, criterion, trainset, testset, epochs)
 
         sum_term = [0]
         for e in li_summand:
@@ -226,23 +225,16 @@ if __name__ == '__main__':
 
         # plot
         acc_dict[p] = train_acc, test_acc
-        if std_coef != 0:
-            if dataset_size == batch_size:
-                coef = 8.12 / dataset_size
-            else:
-                coef = 2 * math.sqrt(2) / dataset_size
-            fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='li')
-            #fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size for i in new_sum_term], label='banerjee')
+        bound_dict[p] = (calc_li_bound(li_summand, dataset_size, dataset_size != batch_size),
+                         calc_banerjee_bound(banerjee_summand, dataset_size, dataset_size != batch_size))
+        grad_dict[p] = sq_grad_norm, grad_disc
+
         fig5ax.plot(range(len(li_summand)), [i * (std_coef ** 2) for i in li_summand], label='(squared gradient norm) p=' + str(p))
         fig5ax.plot(range(len(li_summand)), [i * (std_coef ** 2) for i in torch.mean(banerjee_summand, dim=1)], label='(squared gradient discrepancy) p=' + str(p))
 
-        plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand, banerjee_summand)
+        plot_everything(path, p, dataset_size, train_acc, test_acc, li_summand, banerjee_summand)
 
     plot_acc(path, acc_dict)
-    if std_coef != 0:
-        fig4ax.legend()
     fig5ax.legend()
-    if std_coef != 0:
-        fig4.savefig('experiments/'+experiment_name+'/gen_error_bound.png')
     fig5.savefig('experiments/'+experiment_name+'/average_squared_gradient_norm.png')
 
