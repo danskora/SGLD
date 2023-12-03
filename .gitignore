@@ -6,4 +6,8 @@
 !/data/__init__.py
 !/data/datasets.py
 
+/models/*
+!/models/__init__.py
+!/models/models.py
+
 /experiments/
