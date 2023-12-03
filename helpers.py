@@ -59,9 +59,9 @@ def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, ban
     fig.suptitle('noise = ' + str(p))
 
     epochs = len(train_acc)
-    if li_summand:
+    if li_summand is not None:
         batches = len(li_summand) // epochs
-    elif banerjee_summand:
+    elif banerjee_summand is not None:
         batches = len(banerjee_summand) // epochs
     else:
         batches = 1
@@ -70,10 +70,10 @@ def plot_bounds(path, p, dataset_size, train_acc, test_acc, li_summand=None, ban
             label='train accuracy')
     ax.plot(range(batches, (epochs+1) * batches, batches), [a-b for a, b in zip(train_acc, test_acc)],
             label=r'$err_{gen}(S)$')
-    if li_summand:
+    if li_summand is not None:
         ax.plot(range(len(li_summand)), calc_li_bound(li_summand, dataset_size, batches != 1),
                 label=r'li $err_{gen}$ bound')
-    if banerjee_summand:
+    if banerjee_summand is not None:
         ax.plot(range(len(banerjee_summand)), calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1),
                 label=r'banerjee $err_{gen}$ bound')
 
