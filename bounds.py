@@ -31,32 +31,36 @@ def calc_li_summand(model, optimizer, criterion, dataset):  # doesn't matter but
     return total / 200, total / 200 / (optimizer.std_coef ** 2)
 
 
-def calc_banerjee_summand(model, optimizer, criterion, trainset, testset):
+def calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls):
     device = optimizer.device
 
-    i1 = random.randint(0, len(trainset) - 1)
-    i2 = random.randint(0, len(testset) - 1)
-    d1, l1 = trainset[i1]
-    d2, l2 = testset[i2]
-    d1.unsqueeze_(0)
-    d2.unsqueeze_(0)
-    optimizer.zero_grad()
-    loss = criterion(model(d1.to(device)), torch.tensor([l1], device=device))
-    loss.backward()
-    p1 = []
-    for p in model.parameters():
-        p1.append(p.grad.detach().clone())
-    optimizer.zero_grad()
-    loss = criterion(model(d2.to(device)), torch.tensor([l2], device=device))
-    loss.backward()
-    p2 = []
-    for p in model.parameters():
-        p2.append(p.grad.detach().clone())
-    diff = [a-b for a, b in zip(p1, p2)]
-    total = 0
-    for x in diff:
-        total += torch.sum(x ** 2).item()
-    return total, total / (optimizer.std_coef ** 2)
+    res = []
+    for d1, l1 in z_ls:
+        for d2, l2 in z_prime_ls:
+            d1.unsqueeze_(0)  # does this cause issues by adding a dimension each time this method is called
+            d2.unsqueeze_(0)
+
+            optimizer.zero_grad()
+            loss = criterion(model(d1.to(device)), torch.tensor([l1], device=device))
+            loss.backward()
+            p1 = []
+            for p in model.parameters():
+                p1.append(p.grad.detach().clone())
+
+            optimizer.zero_grad()
+            loss = criterion(model(d2.to(device)), torch.tensor([l2], device=device))
+            loss.backward()
+            p2 = []
+            for p in model.parameters():
+                p2.append(p.grad.detach().clone())
+
+            diff = [a-b for a, b in zip(p1, p2)]
+            total = 0
+            for x in diff:
+                total += torch.sum(x ** 2).item()
+            res.append(total)
+
+    return res, [i / (optimizer.std_coef ** 2) for i in res]
 
 
 def calc_li_bound(summand_ls, n, stochastic=True):
@@ -69,13 +73,11 @@ def calc_li_bound(summand_ls, n, stochastic=True):
     return [C * math.sqrt(i) / n for i in summation_ls]
 
 
-def calc_banerjee_bound(summand_ls, n, stochastic=True):
-    summation_ls = [0]
-    for e in summand_ls:
-        summation_ls.append(summation_ls[-1] + e)
-    summation_ls.pop(0)
+def calc_banerjee_bound(summand_tensor, n, stochastic=True):
+    summation_tensor = torch.cumsum(summand_tensor, dim=0)
+    expectation_S = torch.mean(torch.sqrt(summation_tensor), dim=1)
 
     if not stochastic:
         raise Exception('Banerjee bound requires stochastic gradient!')
     C = banerjee_sgld_constant
-    return [C * math.sqrt(i) / n for i in summation_ls]
+    return [C * i / n for i in expectation_S]

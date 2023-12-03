@@ -30,6 +30,14 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
     g_e = []
     new_g_e = []
 
+    z_ls = []       # this depends on dataset having 10 label types, so it won't work on CIFAR100 but whatever
+    z_prime_ls = []
+    for i in range(10):
+        indices = train_loader.dataset.targets == i
+        z_ls.append(train_loader.dataset[indices[0]])
+        indices = test_loader.dataset.targets == i
+        z_prime_ls.append(test_loader.dataset[indices[0]])
+
     for epoch in range(epochs):
 
         # train
@@ -39,7 +47,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
             inputs = _inputs.to(device)
             labels = _labels.to(device)
             g_e.append(calc_li_summand(model, optimizer, criterion, train_loader.dataset)[1])
-            new_g_e.append(calc_banerjee_summand(model, optimizer, criterion, train_loader.dataset, test_loader.dataset)[1])
+            new_g_e.append(calc_banerjee_summand(model, optimizer, criterion, z_ls, z_prime_ls)[1])
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -62,7 +70,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, test_loade
         if epoch % 100 == 99:
             print("Completed " + str(epoch+1) + " epochs.")
 
-    return train_acc, test_acc, g_e, new_g_e
+    return train_acc, test_acc, g_e, torch.FloatTensor(new_g_e)
 
 
 if __name__ == '__main__':
@@ -222,7 +230,8 @@ if __name__ == '__main__':
                 coef = 2 * math.sqrt(2) / dataset_size
             fig4ax.plot(range(len(sum_term)), [math.sqrt(i) * coef for i in sum_term], label='li')
             fig4ax.plot(range(len(sum_term)), [math.sqrt(i) / dataset_size for i in new_sum_term], label='banerjee')
-        fig5ax.plot(range(len(g_e)), [i * (std_coef ** 2) for i in g_e], label='p='+str(p))
+        fig5ax.plot(range(len(g_e)), [i * (std_coef ** 2) for i in g_e], label='(squared gradient norm) p='+str(p))
+        fig5ax.plot(range(len(g_e)), [i * (std_coef ** 2) for i in torch.mean(new_g_e, dim=1)], label='(squared gradient discrepancy) p='+str(p))
 
         plot_bounds(path, p, dataset_size, train_acc, test_acc, g_e, new_g_e)
 
