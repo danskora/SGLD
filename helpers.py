@@ -84,6 +84,7 @@ def plot_everything(path, p, dataset_size, train_acc, test_acc, li_summand=None,
     fig = plt.figure()
     ax = fig.add_subplot()
     ax.set_xlabel('Step') if li_summand or banerjee_summand else ax.set_xlabel('Epoch')
+    ax.set_ylim([0, 1])
     fig.suptitle('noise = ' + str(p))
 
     epochs = len(train_acc)
