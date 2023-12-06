@@ -53,6 +53,34 @@ def plot_acc(path, acc_dict):
 
 def plot_everything(path, p, dataset_size, train_acc, test_acc, li_summand=None, banerjee_summand=None):
 
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.set_xlabel('Step') if li_summand or banerjee_summand else ax.set_xlabel('Epoch')
+    # fig.suptitle('noise = ' + str(p))
+    #
+    # epochs = len(train_acc)
+    # if li_summand is not None:
+    #     batches = len(li_summand) // epochs
+    # elif banerjee_summand is not None:
+    #     batches = len(banerjee_summand) // epochs
+    # else:
+    #     batches = 1
+    #
+    # ax.plot(range(batches, (epochs+1) * batches, batches), train_acc,
+    #         label='train accuracy')
+    # ax.plot(range(batches, (epochs+1) * batches, batches), [a-b for a, b in zip(train_acc, test_acc)],
+    #         label=r'$err_{gen}(S)$')
+    # if li_summand is not None:
+    #     ax.plot(range(1, len(li_summand)+1, 1), calc_li_bound(li_summand, dataset_size, batches != 1),
+    #             label=r'li $err_{gen}$ bound')
+    # if banerjee_summand is not None:
+    #     ax.plot(range(1, len(banerjee_summand)+1, 1), calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1),
+    #             label=r'banerjee $err_{gen}$ bound')
+    #
+    # ax.legend()
+    #
+    # fig.savefig(path + '/noise' + str(p) + '.png')
+
     fig = plt.figure()
     ax = fig.add_subplot()
     ax.set_xlabel('Step') if li_summand or banerjee_summand else ax.set_xlabel('Epoch')
@@ -66,16 +94,22 @@ def plot_everything(path, p, dataset_size, train_acc, test_acc, li_summand=None,
     else:
         batches = 1
 
-    ax.plot(range(batches, (epochs+1) * batches, batches), train_acc,
-            label='train accuracy')
-    ax.plot(range(batches, (epochs+1) * batches, batches), [a-b for a, b in zip(train_acc, test_acc)],
-            label=r'$err_{gen}(S)$')
+    train_err = [1-i for i in train_acc]
+    test_err = [1-i for i in test_acc]
+    stretched_train_err = sum([[i]*batches for i in train_err], [])
+
+    ax.plot(range(batches, (epochs + 1) * batches, batches), train_err,
+            label='train error')
+    ax.plot(range(batches, (epochs + 1) * batches, batches), test_err,
+            label='test error')
     if li_summand is not None:
-        ax.plot(range(1, len(li_summand)+1, 1), calc_li_bound(li_summand, dataset_size, batches != 1),
-                label=r'li $err_{gen}$ bound')
+        ax.plot(range(1, len(li_summand) + 1, 1),
+                [a+b for a,b in zip(stretched_train_err, calc_li_bound(li_summand, dataset_size, batches != 1))],
+                label=r'train error + li $err_{gen}$ bound')
     if banerjee_summand is not None:
-        ax.plot(range(1, len(banerjee_summand)+1, 1), calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1),
-                label=r'banerjee $err_{gen}$ bound')
+        ax.plot(range(1, len(banerjee_summand) + 1, 1),
+                [a+b for a,b in zip(stretched_train_err, calc_banerjee_bound(banerjee_summand, dataset_size, batches != 1))],
+                label=r'train error + banerjee $err_{gen}$ bound')
 
     ax.legend()
 

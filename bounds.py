@@ -79,14 +79,14 @@ def calc_banerjee_bound(summand_tensor, n, stochastic=True):
 
     ###### temporary code to visualize the different bounds for different z and z'
 
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    ax.set_xlabel('Step')
-    ax.set_ylabel('High Variance Bound')
-    fig.suptitle('Banerjee Bonus')
-    for i in range(100):
-        ax.plot(range(len(summation_tensor)), summation_tensor[:, i])
-    fig.savefig('experiments/BONUS.png')
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.set_xlabel('Step')
+    # ax.set_ylabel('High Variance Bound')
+    # fig.suptitle('Banerjee Bonus')
+    # for i in range(100):
+    #     ax.plot(range(len(summation_tensor)), summation_tensor[:, i])
+    # fig.savefig('experiments/BONUS.png')
 
     ###### this will run several times and plot into the same file, so we will always see the last value of p
 
